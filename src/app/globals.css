@@ -20,6 +20,110 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Enhanced focus management and keyboard navigation */
+*:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Skip to main content link for screen readers */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #3b82f6;
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Ensure interactive elements have minimum touch target size */
+button, a, input, select, textarea {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+  }
+  
+  * {
+    border-color: currentColor !important;
+  }
+  
+  button, .card {
+    border: 2px solid currentColor !important;
+  }
+  
+  /* Ensure high contrast for all text */
+  .text-gray-600 {
+    color: #000000 !important;
+  }
+  
+  .text-blue-100 {
+    color: #ffffff !important;
+  }
+  
+  .text-blue-600 {
+    color: #000080 !important;
+  }
+  
+  /* High contrast button styles */
+  .bg-blue-600 {
+    background-color: #000080 !important;
+    color: #ffffff !important;
+  }
+  
+  .bg-gray-100 {
+    background-color: #f0f0f0 !important;
+    color: #000000 !important;
+  }
+}
+
+/* Ensure WCAG AA compliance for color contrast ratios */
+.text-gray-600 {
+  color: #4a5568; /* Contrast ratio 7.54:1 with white background */
+}
+
+.text-gray-900 {
+  color: #1a202c; /* Contrast ratio 16.68:1 with white background */
+}
+
+.text-blue-600 {
+  color: #2563eb; /* Contrast ratio 5.74:1 with white background */
+}
+
+.bg-blue-600 {
+  background-color: #2563eb; /* Ensures good contrast with white text */
+}
+
+/* Ensure sufficient contrast for interactive elements */
+.hover\:bg-blue-700:hover {
+  background-color: #1d4ed8; /* Darker blue for better contrast */
+}
+
+.active\:bg-blue-800:active {
+  background-color: #1e40af; /* Even darker for active state */
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

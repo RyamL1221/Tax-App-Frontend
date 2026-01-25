@@ -20,7 +20,7 @@ export interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = 'default', children, ...props }, ref) => {
-    const baseStyles = 'rounded-lg border bg-card text-card-foreground';
+    const baseStyles = 'rounded-lg border bg-card text-card-foreground focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2';
     
     const variants = {
       default: 'border-gray-200 bg-white shadow-sm',

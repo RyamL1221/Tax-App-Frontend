@@ -27,12 +27,22 @@ const Hero: React.FC<HeroProps> = ({
     }
   };
   return (
-    <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-16 px-4 sm:py-24 sm:px-6 lg:px-8">
+    <section 
+      className="bg-gradient-to-br from-blue-50 to-indigo-100 py-16 px-4 sm:py-24 sm:px-6 lg:px-8"
+      aria-labelledby="hero-heading"
+      role="banner"
+    >
       <div className="max-w-4xl mx-auto text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
+        <h1 
+          id="hero-heading"
+          className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl"
+        >
           {headline}
         </h1>
-        <p className="mt-6 text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+        <p 
+          className="mt-6 text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed"
+          aria-describedby="hero-heading"
+        >
           {subtitle}
         </p>
         <div className="mt-10">
@@ -41,6 +51,8 @@ const Hero: React.FC<HeroProps> = ({
             size="lg"
             onClick={handleCtaClick}
             className="px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+            aria-describedby="hero-heading"
+            aria-label={`${ctaText} - Begin your tax preparation process`}
           >
             {ctaText}
           </Button>

@@ -55,22 +55,38 @@ const CallToAction: React.FC<CallToActionProps> = ({
     }
   };
   return (
-    <section className="py-16 px-4 sm:py-24 sm:px-6 lg:px-8 bg-blue-600">
+    <section 
+      className="py-16 px-4 sm:py-24 sm:px-6 lg:px-8 bg-blue-600"
+      aria-labelledby="cta-heading"
+      role="region"
+    >
       <div className="max-w-4xl mx-auto text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h2 
+          id="cta-heading"
+          className="text-3xl font-bold tracking-tight text-white sm:text-4xl"
+        >
           Ready to Simplify Your Tax Filing?
         </h2>
-        <p className="mt-6 text-xl text-blue-100 max-w-3xl mx-auto">
+        <p 
+          className="mt-6 text-xl text-blue-100 max-w-3xl mx-auto"
+          aria-describedby="cta-heading"
+        >
           Join thousands of users who have streamlined their tax preparation process with Tax App. 
           Get started today and experience the difference automated form filling can make.
         </p>
         
-        <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <div 
+          className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
+          role="group"
+          aria-label="Call to action buttons"
+        >
           <Button
             variant="primary"
             size="lg"
             onClick={handlePrimaryClick}
             className="bg-white text-blue-600 hover:bg-gray-50 active:bg-gray-100 px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+            aria-describedby="cta-heading"
+            aria-label={`${primaryText} - Begin your tax preparation process now`}
           >
             {primaryText}
           </Button>
@@ -80,6 +96,8 @@ const CallToAction: React.FC<CallToActionProps> = ({
             size="lg"
             onClick={handleSecondaryClick}
             className="border-white text-white hover:bg-white hover:text-blue-600 active:bg-gray-50 px-8 py-4 text-lg font-semibold transition-all duration-200"
+            aria-describedby="cta-heading"
+            aria-label={`${secondaryText} - Get more information about our tax preparation process`}
           >
             {secondaryText}
           </Button>
@@ -88,33 +106,78 @@ const CallToAction: React.FC<CallToActionProps> = ({
         <div className="mt-8">
           <button
             onClick={handleSupportClick}
-            className="text-blue-100 hover:text-white underline text-lg transition-colors duration-200"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleSupportClick();
+              }
+            }}
+            className="text-blue-100 hover:text-white underline text-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600 rounded-sm px-2 py-1"
+            aria-label={`${supportText} - Get help from our support team`}
           >
             {supportText}
           </button>
         </div>
         
         {/* Trust indicators and security information */}
-        <div className="mt-12 pt-8 border-t border-blue-500">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="flex flex-col items-center">
-              <svg className="w-8 h-8 text-blue-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div 
+          className="mt-12 pt-8 border-t border-blue-500"
+          role="complementary"
+          aria-label="Trust indicators and security information"
+        >
+          <div 
+            className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center"
+            role="list"
+            aria-label="Security and compliance features"
+          >
+            <div 
+              className="flex flex-col items-center"
+              role="listitem"
+            >
+              <svg 
+                className="w-8 h-8 text-blue-200 mb-2" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                aria-label="Security lock icon"
+                role="img"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               <h3 className="text-lg font-semibold text-white mb-1">Bank-Level Security</h3>
               <p className="text-blue-100 text-sm">256-bit SSL encryption protects your sensitive tax information</p>
             </div>
             
-            <div className="flex flex-col items-center">
-              <svg className="w-8 h-8 text-blue-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              className="flex flex-col items-center"
+              role="listitem"
+            >
+              <svg 
+                className="w-8 h-8 text-blue-200 mb-2" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                aria-label="Compliance checkmark icon"
+                role="img"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <h3 className="text-lg font-semibold text-white mb-1">IRS Compliant</h3>
               <p className="text-blue-100 text-sm">Fully compliant with all IRS e-filing requirements and standards</p>
             </div>
             
-            <div className="flex flex-col items-center">
-              <svg className="w-8 h-8 text-blue-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div 
+              className="flex flex-col items-center"
+              role="listitem"
+            >
+              <svg 
+                className="w-8 h-8 text-blue-200 mb-2" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                aria-label="24/7 support icon"
+                role="img"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M12 3v6m0 6v6m6-12h-6m-6 0h6" />
               </svg>
               <h3 className="text-lg font-semibold text-white mb-1">24/7 Support</h3>
