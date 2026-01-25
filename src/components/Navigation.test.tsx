@@ -10,13 +10,7 @@ import * as fc from 'fast-check';
 import Hero from './Hero';
 import CallToAction from './CallToAction';
 import { navigateToTaxPreparation, navigateToLearnMore, navigateToSupport } from '@/lib/navigation';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { beforeEach } from 'node:test';
-import { describe } from 'node:test';
+import { test, beforeEach, describe } from 'node:test';
 
 // Mock the navigation functions
 jest.mock('@/lib/navigation', () => ({
