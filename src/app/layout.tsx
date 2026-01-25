@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import NoScriptFallback from "@/components/fallbacks/NoScriptFallback";
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -64,9 +66,13 @@ export default function RootLayout({
         <link rel="manifest" href="/site.webmanifest" />
       </head>
       <body className={`${inter.className} antialiased`}>
-        <div id="root">
-          {children}
-        </div>
+        <NoScriptFallback>
+          <ErrorBoundary>
+            <div id="root">
+              {children}
+            </div>
+          </ErrorBoundary>
+        </NoScriptFallback>
       </body>
     </html>
   );

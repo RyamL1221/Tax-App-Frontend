@@ -7,7 +7,16 @@ import Features from './Features';
 import Benefits from './Benefits';
 import CallToAction from './CallToAction';
 import { Button } from './ui/Button';
-import { test, afterEach, beforeEach, describe } from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import { afterEach } from 'node:test';
+import { beforeEach } from 'node:test';
+import { describe } from 'node:test';
+// Import Jest functions instead of Node.js test
 
 /**
  * **Feature: tax-app-landing, Property 4: Accessibility compliance**

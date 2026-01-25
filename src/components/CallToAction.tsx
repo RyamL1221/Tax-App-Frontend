@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
 import { navigateToTaxPreparation, navigateToLearnMore, navigateToSupport, handleNavigationError } from '@/lib/navigation';
+import { useLoadingState } from '@/hooks/useLoadingState';
 
 export interface CallToActionProps {
   primaryText?: string;
@@ -19,16 +20,23 @@ const CallToAction: React.FC<CallToActionProps> = ({
   supportText = "Contact Support",
   supportAction
 }) => {
+  const primaryLoading = useLoadingState();
+  const secondaryLoading = useLoadingState();
+
   const handlePrimaryClick = async () => {
     if (primaryAction) {
       primaryAction();
       return;
     }
     
-    const result = await navigateToTaxPreparation();
-    if (!result.success && result.error) {
-      handleNavigationError(result.error);
-    }
+    await primaryLoading.executeAsync(async () => {
+      const result = await navigateToTaxPreparation();
+      if (!result.success && result.error) {
+        handleNavigationError(result.error);
+        throw new Error(result.error);
+      }
+      return result;
+    });
   };
 
   const handleSecondaryClick = async () => {
@@ -37,10 +45,14 @@ const CallToAction: React.FC<CallToActionProps> = ({
       return;
     }
     
-    const result = await navigateToLearnMore();
-    if (!result.success && result.error) {
-      handleNavigationError(result.error);
-    }
+    await secondaryLoading.executeAsync(async () => {
+      const result = await navigateToLearnMore();
+      if (!result.success && result.error) {
+        handleNavigationError(result.error);
+        throw new Error(result.error);
+      }
+      return result;
+    });
   };
 
   const handleSupportClick = async () => {
@@ -54,6 +66,7 @@ const CallToAction: React.FC<CallToActionProps> = ({
       handleNavigationError(result.error);
     }
   };
+
   return (
     <section 
       className="py-16 px-4 sm:py-24 sm:px-6 lg:px-8 bg-blue-600"
@@ -84,6 +97,8 @@ const CallToAction: React.FC<CallToActionProps> = ({
             variant="primary"
             size="lg"
             onClick={handlePrimaryClick}
+            loading={primaryLoading.isLoading}
+            loadingText="Starting..."
             className="bg-white text-blue-600 hover:bg-gray-50 active:bg-gray-100 px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
             aria-describedby="cta-heading"
             aria-label={`${primaryText} - Begin your tax preparation process now`}
@@ -95,6 +110,8 @@ const CallToAction: React.FC<CallToActionProps> = ({
             variant="outline"
             size="lg"
             onClick={handleSecondaryClick}
+            loading={secondaryLoading.isLoading}
+            loadingText="Loading..."
             className="border-white text-white hover:bg-white hover:text-blue-600 active:bg-gray-50 px-8 py-4 text-lg font-semibold transition-all duration-200"
             aria-describedby="cta-heading"
             aria-label={`${secondaryText} - Get more information about our tax preparation process`}

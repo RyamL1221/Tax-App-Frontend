@@ -20,6 +20,45 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Performance optimizations */
+* {
+  box-sizing: border-box;
+}
+
+/* Optimize font loading */
+@font-face {
+  font-family: 'Inter';
+  font-display: swap;
+}
+
+/* Reduce layout shifts */
+img, video {
+  height: auto;
+  max-width: 100%;
+}
+
+/* Optimize animations for performance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* GPU acceleration for smooth animations */
+.transform {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.animate-spin {
+  will-change: transform;
+}
+
 /* Enhanced focus management and keyboard navigation */
 *:focus {
   outline: 2px solid #3b82f6;
@@ -124,8 +163,47 @@ button, a, input, select, textarea {
   background-color: #1e40af; /* Even darker for active state */
 }
 
+/* Performance optimizations for loading states */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Optimize scroll performance */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-smooth {
+    scroll-behavior: auto;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  
+  /* Performance utilities */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  .optimize-legibility {
+    text-rendering: optimizeLegibility;
+  }
+  
+  .optimize-speed {
+    text-rendering: optimizeSpeed;
   }
 }

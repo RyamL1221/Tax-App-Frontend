@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
 import { navigateToTaxPreparation, handleNavigationError } from '@/lib/navigation';
+import { useLoadingState } from '@/hooks/useLoadingState';
 
 export interface HeroProps {
   headline?: string;
@@ -15,17 +16,24 @@ const Hero: React.FC<HeroProps> = ({
   ctaText = "Start Your Tax Preparation",
   onCtaClick
 }) => {
+  const { isLoading, executeAsync } = useLoadingState();
+
   const handleCtaClick = async () => {
     if (onCtaClick) {
       onCtaClick();
       return;
     }
     
-    const result = await navigateToTaxPreparation();
-    if (!result.success && result.error) {
-      handleNavigationError(result.error);
-    }
+    await executeAsync(async () => {
+      const result = await navigateToTaxPreparation();
+      if (!result.success && result.error) {
+        handleNavigationError(result.error);
+        throw new Error(result.error);
+      }
+      return result;
+    });
   };
+
   return (
     <section 
       className="bg-gradient-to-br from-blue-50 to-indigo-100 py-16 px-4 sm:py-24 sm:px-6 lg:px-8"
@@ -50,6 +58,8 @@ const Hero: React.FC<HeroProps> = ({
             variant="primary"
             size="lg"
             onClick={handleCtaClick}
+            loading={isLoading}
+            loadingText="Starting..."
             className="px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
             aria-describedby="hero-heading"
             aria-label={`${ctaText} - Begin your tax preparation process`}
