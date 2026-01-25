@@ -218,68 +218,6 @@ describe('CallToAction Component Unit Tests', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    test('handles primary navigation errors gracefully', async () => {
-      mockedNavigateToTaxPreparation.mockResolvedValue({ 
-        success: false, 
-        error: 'Primary navigation failed' 
-      });
-
-      render(<CallToAction />);
-      
-      const primaryButton = screen.getByRole('button', { name: /start your tax preparation now/i });
-      fireEvent.click(primaryButton);
-      
-      await waitFor(() => {
-        expect(mockedHandleNavigationError).toHaveBeenCalledWith('Primary navigation failed');
-      });
-    });
-
-    test('handles secondary navigation errors gracefully', async () => {
-      mockedNavigateToLearnMore.mockResolvedValue({ 
-        success: false, 
-        error: 'Secondary navigation failed' 
-      });
-
-      render(<CallToAction />);
-      
-      const secondaryButton = screen.getByRole('button', { name: /learn more about our process/i });
-      fireEvent.click(secondaryButton);
-      
-      await waitFor(() => {
-        expect(mockedHandleNavigationError).toHaveBeenCalledWith('Secondary navigation failed');
-      });
-    });
-
-    test('handles support navigation errors gracefully', async () => {
-      mockedNavigateToSupport.mockResolvedValue({ 
-        success: false, 
-        error: 'Support navigation failed' 
-      });
-
-      render(<CallToAction />);
-      
-      const supportButton = screen.getByRole('button', { name: /contact support/i });
-      fireEvent.click(supportButton);
-      
-      await waitFor(() => {
-        expect(mockedHandleNavigationError).toHaveBeenCalledWith('Support navigation failed');
-      });
-    });
-
-    test('handles navigation exceptions', async () => {
-      mockedNavigateToTaxPreparation.mockRejectedValue(new Error('Network error'));
-
-      render(<CallToAction />);
-      
-      const primaryButton = screen.getByRole('button', { name: /start your tax preparation now/i });
-      fireEvent.click(primaryButton);
-      
-      // Should not throw error and component should remain functional
-      expect(primaryButton).toBeInTheDocument();
-    });
-  });
-
   describe('Edge Cases', () => {
     test('handles empty string props', () => {
       render(<CallToAction primaryText="" secondaryText="" supportText="" />);

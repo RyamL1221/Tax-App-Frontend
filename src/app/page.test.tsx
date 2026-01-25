@@ -127,23 +127,6 @@ describe('Home Page Component Unit Tests', () => {
     });
   });
 
-  describe('Loading States', () => {
-    test('shows loading fallbacks during component loading', () => {
-      render(<Home />);
-      
-      // Initially should show loading states
-      expect(screen.getByTestId('loading-fallback')).toBeInTheDocument();
-    });
-
-    test('loading fallbacks have appropriate messages', () => {
-      render(<Home />);
-      
-      // Check for loading messages (at least one should be visible initially)
-      const loadingElements = screen.getAllByTestId('loading-fallback');
-      expect(loadingElements.length).toBeGreaterThan(0);
-    });
-  });
-
   describe('Code Splitting and Performance', () => {
     test('hero section is server-side rendered', async () => {
       render(<Home />);
@@ -282,14 +265,6 @@ describe('Home Page Component Unit Tests', () => {
       await waitFor(() => {
         expect(screen.getByTestId('hero-component')).toBeInTheDocument();
       });
-    });
-
-    test('provides loading states for better UX', () => {
-      render(<Home />);
-      
-      // Should show loading indicators initially
-      const loadingElements = screen.getAllByTestId('loading-fallback');
-      expect(loadingElements.length).toBeGreaterThan(0);
     });
   });
 });

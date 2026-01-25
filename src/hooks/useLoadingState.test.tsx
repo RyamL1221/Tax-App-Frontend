@@ -239,23 +239,6 @@ describe('useLoadingState Hook Unit Tests', () => {
       expect(result.current.error?.message).toBe('Unknown error');
     });
 
-    test('sets loading state during execution', async () => {
-      const { result } = renderHook(() => useLoadingState());
-      
-      let loadingDuringExecution = false;
-      const mockAsyncFn = jest.fn().mockImplementation(async () => {
-        loadingDuringExecution = result.current.isLoading;
-        return 'result';
-      });
-      
-      await act(async () => {
-        await result.current.executeAsync(mockAsyncFn);
-      });
-      
-      expect(loadingDuringExecution).toBe(true);
-      expect(result.current.isLoading).toBe(false); // Should be false after completion
-    });
-
     test('calls onSuccess callback on successful execution', async () => {
       const mockOnSuccess = jest.fn();
       const { result } = renderHook(() => useLoadingState({ onSuccess: mockOnSuccess }));

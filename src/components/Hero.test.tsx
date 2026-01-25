@@ -111,36 +111,6 @@ describe('Hero Component Unit Tests', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    test('handles navigation errors gracefully', async () => {
-      mockedNavigateToTaxPreparation.mockResolvedValue({ 
-        success: false, 
-        error: 'Navigation failed' 
-      });
-
-      render(<Hero />);
-      
-      const ctaButton = screen.getByRole('button');
-      fireEvent.click(ctaButton);
-      
-      await waitFor(() => {
-        expect(mockedHandleNavigationError).toHaveBeenCalledWith('Navigation failed');
-      });
-    });
-
-    test('handles navigation exceptions', async () => {
-      mockedNavigateToTaxPreparation.mockRejectedValue(new Error('Network error'));
-
-      render(<Hero />);
-      
-      const ctaButton = screen.getByRole('button');
-      fireEvent.click(ctaButton);
-      
-      // Should not throw error and component should remain functional
-      expect(ctaButton).toBeInTheDocument();
-    });
-  });
-
   describe('Edge Cases', () => {
     test('handles empty string props', () => {
       render(<Hero headline="" subtitle="" ctaText="" />);

@@ -88,10 +88,15 @@ describe('Features Component Unit Tests', () => {
     test('displays feature icons with accessibility attributes', () => {
       render(<Features />);
       
-      const icons = screen.getAllByRole('img');
-      icons.forEach((icon) => {
-        expect(icon).toHaveAttribute('aria-label');
-        expect(icon.getAttribute('aria-label')).toContain('icon');
+      // Icons are decorative and hidden from screen readers (aria-hidden="true")
+      // but they still have role="img" and aria-label for the SVG elements themselves
+      const container = screen.getByRole('region', { name: /key features/i });
+      const svgs = container.querySelectorAll('svg[role="img"]');
+      
+      expect(svgs.length).toBeGreaterThan(0);
+      svgs.forEach((svg) => {
+        expect(svg).toHaveAttribute('aria-label');
+        expect(svg.getAttribute('aria-label')).toContain('icon');
       });
     });
 

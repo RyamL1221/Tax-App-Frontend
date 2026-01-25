@@ -87,17 +87,17 @@ describe('Footer Component Unit Tests', () => {
     test('has correct href attributes for all links', () => {
       render(<Footer />);
       
-      // Quick Links
-      expect(screen.getByRole('link', { name: /features/i })).toHaveAttribute('href', '/features');
-      expect(screen.getByRole('link', { name: /pricing/i })).toHaveAttribute('href', '/pricing');
-      expect(screen.getByRole('link', { name: /support/i })).toHaveAttribute('href', '/support');
-      expect(screen.getByRole('link', { name: /contact/i })).toHaveAttribute('href', '/contact');
+      // Quick Links - use more specific names to avoid ambiguity
+      expect(screen.getByRole('link', { name: /learn about tax app features/i })).toHaveAttribute('href', '/features');
+      expect(screen.getByRole('link', { name: /view tax app pricing/i })).toHaveAttribute('href', '/pricing');
+      expect(screen.getByRole('link', { name: /get help and support/i })).toHaveAttribute('href', '/support');
+      expect(screen.getByRole('link', { name: /contact tax app team/i })).toHaveAttribute('href', '/contact');
       
       // Legal & Security
-      expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute('href', '/privacy');
-      expect(screen.getByRole('link', { name: /terms of service/i })).toHaveAttribute('href', '/terms');
-      expect(screen.getByRole('link', { name: /security/i })).toHaveAttribute('href', '/security');
-      expect(screen.getByRole('link', { name: /compliance/i })).toHaveAttribute('href', '/compliance');
+      expect(screen.getByRole('link', { name: /read our privacy policy/i })).toHaveAttribute('href', '/privacy');
+      expect(screen.getByRole('link', { name: /read terms of service/i })).toHaveAttribute('href', '/terms');
+      expect(screen.getByRole('link', { name: /learn about our security measures/i })).toHaveAttribute('href', '/security');
+      expect(screen.getByRole('link', { name: /view compliance information/i })).toHaveAttribute('href', '/compliance');
     });
 
     test('has proper focus management for all links', () => {

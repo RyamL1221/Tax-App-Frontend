@@ -2,32 +2,6 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Benefits from './Benefits';
-import test from 'node:test';
-import test from 'node:test';
-import { describe } from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { describe } from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { describe } from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { describe } from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { describe } from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { describe } from 'node:test';
-import { describe } from 'node:test';
 
 describe('Benefits Component Unit Tests', () => {
   const mockBenefits = [
@@ -76,8 +50,9 @@ describe('Benefits Component Unit Tests', () => {
     test('has proper semantic HTML structure', () => {
       render(<Benefits />);
       
-      const section = screen.getByRole('region');
-      expect(section).toHaveAttribute('aria-labelledby', 'benefits-heading');
+      const sections = screen.getAllByRole('region');
+      const mainSection = sections[0]; // First region is the main benefits section
+      expect(mainSection).toHaveAttribute('aria-labelledby', 'benefits-heading');
       
       const heading = screen.getByRole('heading', { level: 2 });
       expect(heading).toHaveAttribute('id', 'benefits-heading');
@@ -145,9 +120,9 @@ describe('Benefits Component Unit Tests', () => {
       
       expect(screen.getByText('Empty Metric Benefit')).toBeInTheDocument();
       
-      // Should not display empty metric
-      const card = screen.getByRole('listitem');
-      const metricDiv = card.querySelector('.text-3xl.font-bold.text-blue-600');
+      // Should not display empty metric - query all and check the first one
+      const cards = screen.getAllByRole('listitem');
+      const metricDiv = cards[0].querySelector('.text-3xl.font-bold.text-blue-600');
       expect(metricDiv).not.toBeInTheDocument();
     });
   });

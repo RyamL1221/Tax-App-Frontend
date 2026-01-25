@@ -3,7 +3,10 @@ import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import * as fc from 'fast-check';
 import { Card, CardHeader, CardContent, CardFooter, CardProps } from './Card';
-import { test, describe } from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import { describe } from 'node:test';
 
 /**
  * **Feature: tax-app-landing, Property 2: Responsive design consistency**

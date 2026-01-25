@@ -10,7 +10,13 @@ import * as fc from 'fast-check';
 import Hero from './Hero';
 import CallToAction from './CallToAction';
 import { navigateToTaxPreparation, navigateToLearnMore, navigateToSupport } from '@/lib/navigation';
-import { test, beforeEach, describe } from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import test from 'node:test';
+import { beforeEach } from 'node:test';
+import { describe } from 'node:test';
 
 // Mock the navigation functions
 jest.mock('@/lib/navigation', () => ({
@@ -69,7 +75,8 @@ describe('Navigation Functionality Property Tests', () => {
         async (props) => {
           const { unmount } = render(<Hero {...props} />);
           
-          const ctaButton = screen.getByRole('button', { name: props.ctaText });
+          // Query by text content instead of accessible name
+          const ctaButton = screen.getByText(props.ctaText);
           expect(ctaButton).toBeInTheDocument();
           
           fireEvent.click(ctaButton);
@@ -99,7 +106,8 @@ describe('Navigation Functionality Property Tests', () => {
         async (props) => {
           const { unmount } = render(<CallToAction {...props} />);
           
-          const primaryButton = screen.getByRole('button', { name: props.primaryText });
+          // Query by text content instead of accessible name
+          const primaryButton = screen.getByText(props.primaryText);
           expect(primaryButton).toBeInTheDocument();
           
           fireEvent.click(primaryButton);
@@ -129,7 +137,8 @@ describe('Navigation Functionality Property Tests', () => {
         async (props) => {
           const { unmount } = render(<CallToAction {...props} />);
           
-          const secondaryButton = screen.getByRole('button', { name: props.secondaryText });
+          // Query by text content instead of accessible name
+          const secondaryButton = screen.getByText(props.secondaryText);
           expect(secondaryButton).toBeInTheDocument();
           
           fireEvent.click(secondaryButton);
@@ -159,7 +168,8 @@ describe('Navigation Functionality Property Tests', () => {
         async (props) => {
           const { unmount } = render(<CallToAction {...props} />);
           
-          const supportButton = screen.getByRole('button', { name: props.supportText });
+          // Query by text content instead of accessible name
+          const supportButton = screen.getByText(props.supportText);
           expect(supportButton).toBeInTheDocument();
           
           fireEvent.click(supportButton);
@@ -200,9 +210,10 @@ describe('Navigation Functionality Property Tests', () => {
             />
           );
           
-          const primaryButton = screen.getByRole('button', { name: props.primaryText });
-          const secondaryButton = screen.getByRole('button', { name: props.secondaryText });
-          const supportButton = screen.getByRole('button', { name: props.supportText });
+          // Query by text content instead of accessible name
+          const primaryButton = screen.getByText(props.primaryText);
+          const secondaryButton = screen.getByText(props.secondaryText);
+          const supportButton = screen.getByText(props.supportText);
           
           fireEvent.click(primaryButton);
           fireEvent.click(secondaryButton);

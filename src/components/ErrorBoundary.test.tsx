@@ -25,13 +25,14 @@ const ThrowError: React.FC<{ shouldThrow?: boolean; errorMessage?: string }> = (
 };
 
 describe('ErrorBoundary Component Unit Tests', () => {
+  let mockReload: jest.Mock;
+
   beforeEach(() => {
     jest.clearAllMocks();
     // Mock window.location.reload
-    Object.defineProperty(window, 'location', {
-      value: { reload: jest.fn() },
-      writable: true
-    });
+    mockReload = jest.fn();
+    delete (window as any).location;
+    window.location = { reload: mockReload } as any;
   });
 
   describe('Normal Operation', () => {
@@ -70,7 +71,7 @@ describe('ErrorBoundary Component Unit Tests', () => {
       expect(screen.getByText('Something went wrong')).toBeInTheDocument();
       expect(screen.getByText(/we encountered an unexpected error/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /refresh page/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /refresh the entire page/i })).toBeInTheDocument();
     });
 
     test('renders custom fallback UI when provided', () => {
@@ -121,27 +122,37 @@ describe('ErrorBoundary Component Unit Tests', () => {
 
   describe('User Interactions', () => {
     test('retry button resets error state', () => {
+      // Create a component that can toggle error state
+      let shouldThrow = true;
+      const ToggleError = () => {
+        if (shouldThrow) {
+          throw new Error('Test error');
+        }
+        return <div>Working component</div>;
+      };
+
       const { rerender } = render(
         <ErrorBoundary>
-          <ThrowError shouldThrow={true} />
+          <ToggleError />
         </ErrorBoundary>
       );
       
       // Error UI should be visible
       expect(screen.getByText('Something went wrong')).toBeInTheDocument();
       
-      // Click retry button
+      // Click retry button - this resets the error boundary state
       const retryButton = screen.getByRole('button', { name: /try again/i });
       fireEvent.click(retryButton);
       
-      // Re-render with working component
+      // Now change the component to not throw
+      shouldThrow = false;
       rerender(
         <ErrorBoundary>
-          <ThrowError shouldThrow={false} />
+          <ToggleError />
         </ErrorBoundary>
       );
       
-      // Should show working component
+      // After retry and rerender with non-throwing component, should show working component
       expect(screen.getByText('Working component')).toBeInTheDocument();
       expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
     });
@@ -153,10 +164,10 @@ describe('ErrorBoundary Component Unit Tests', () => {
         </ErrorBoundary>
       );
       
-      const refreshButton = screen.getByRole('button', { name: /refresh page/i });
+      const refreshButton = screen.getByRole('button', { name: /refresh the entire page/i });
       fireEvent.click(refreshButton);
       
-      expect(window.location.reload).toHaveBeenCalledTimes(1);
+      expect(mockReload).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -180,7 +191,7 @@ describe('ErrorBoundary Component Unit Tests', () => {
       );
       
       const retryButton = screen.getByRole('button', { name: /try again/i });
-      const refreshButton = screen.getByRole('button', { name: /refresh page/i });
+      const refreshButton = screen.getByRole('button', { name: /refresh the entire page/i });
       
       expect(retryButton).toHaveAttribute('aria-label', 'Try again to reload the content');
       expect(refreshButton).toHaveAttribute('aria-label', 'Refresh the entire page');
@@ -297,13 +308,19 @@ describe('ErrorBoundary Component Unit Tests', () => {
 
   describe('Component Lifecycle', () => {
     test('resets error state when retry is clicked', () => {
-      const TestComponent = ({ shouldError }: { shouldError: boolean }) => (
+      let shouldThrow = true;
+      const ToggleError = () => {
+        if (shouldThrow) {
+          throw new Error('Test error');
+        }
+        return <div>Working component</div>;
+      };
+
+      const { rerender } = render(
         <ErrorBoundary>
-          <ThrowError shouldThrow={shouldError} />
+          <ToggleError />
         </ErrorBoundary>
       );
-      
-      const { rerender } = render(<TestComponent shouldError={true} />);
       
       // Should show error
       expect(screen.getByText('Something went wrong')).toBeInTheDocument();
@@ -311,8 +328,13 @@ describe('ErrorBoundary Component Unit Tests', () => {
       // Click retry
       fireEvent.click(screen.getByRole('button', { name: /try again/i }));
       
-      // Re-render with no error
-      rerender(<TestComponent shouldError={false} />);
+      // Change component to not throw
+      shouldThrow = false;
+      rerender(
+        <ErrorBoundary>
+          <ToggleError />
+        </ErrorBoundary>
+      );
       
       // Should show working component
       expect(screen.getByText('Working component')).toBeInTheDocument();
@@ -352,7 +374,7 @@ describe('ErrorBoundary Component Unit Tests', () => {
       );
       
       const retryButton = screen.getByRole('button', { name: /try again/i });
-      const refreshButton = screen.getByRole('button', { name: /refresh page/i });
+      const refreshButton = screen.getByRole('button', { name: /refresh the entire page/i });
       
       expect(retryButton).toHaveClass('w-full');
       expect(refreshButton).toHaveClass('w-full');
