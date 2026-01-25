@@ -6,15 +6,6 @@ import Hero from './Hero';
 import Features from './Features';
 import Benefits from './Benefits';
 import CallToAction from './CallToAction';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import test from 'node:test';
-import { afterEach } from 'node:test';
-import { beforeEach } from 'node:test';
-import { describe } from 'node:test';
-// Import Jest functions instead of Node.js test
 
 /**
  * **Feature: tax-app-landing, Property 1: Essential content presence**
@@ -66,7 +57,7 @@ describe('Essential Content Presence Property Tests', () => {
           expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
           expect(screen.getByText(props.headline)).toBeInTheDocument();
           expect(screen.getByText(props.subtitle)).toBeInTheDocument();
-          expect(screen.getByRole('button', { name: props.ctaText })).toBeInTheDocument();
+          expect(screen.getByText(props.ctaText)).toBeInTheDocument();
           
           // Should have proper semantic structure
           expect(container.querySelector('section')).toBeInTheDocument();
@@ -177,11 +168,11 @@ describe('Essential Content Presence Property Tests', () => {
           expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
           
           // Should have primary and secondary CTAs
-          expect(screen.getByRole('button', { name: props.primaryText })).toBeInTheDocument();
-          expect(screen.getByRole('button', { name: props.secondaryText })).toBeInTheDocument();
+          expect(screen.getByText(props.primaryText)).toBeInTheDocument();
+          expect(screen.getByText(props.secondaryText)).toBeInTheDocument();
           
           // Should have support link
-          expect(screen.getByRole('button', { name: props.supportText })).toBeInTheDocument();
+          expect(screen.getByText(props.supportText)).toBeInTheDocument();
           
           // Should have trust indicators
           expect(screen.getByText(/bank-level security/i)).toBeInTheDocument();

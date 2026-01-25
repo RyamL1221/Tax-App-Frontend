@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Benefits from './Benefits';
 
@@ -67,12 +67,16 @@ describe('Benefits Component Unit Tests', () => {
     test('has proper accessibility attributes', () => {
       render(<Benefits />);
       
-      const benefitCards = screen.getAllByRole('listitem');
+      // Get only the benefit cards from the benefits list
+      const benefitsList = screen.getByRole('list', { name: /tax app benefits/i });
+      const benefitCards = within(benefitsList).getAllByRole('listitem');
       benefitCards.forEach((card, index) => {
         expect(card).toHaveAttribute('aria-labelledby', `benefit-title-${index}`);
       });
       
-      const benefitHeadings = screen.getAllByRole('heading', { level: 3 });
+      // Check that benefit headings have proper IDs (only check the first 4 which are benefit cards)
+      const allHeadings = screen.getAllByRole('heading', { level: 3 });
+      const benefitHeadings = allHeadings.slice(0, 4); // First 4 are benefit cards
       benefitHeadings.forEach((heading, index) => {
         expect(heading).toHaveAttribute('id', `benefit-title-${index}`);
       });
@@ -102,8 +106,9 @@ describe('Benefits Component Unit Tests', () => {
       expect(screen.getByText('This benefit has no metric')).toBeInTheDocument();
       
       // Should not have metric display
-      const card = screen.getByRole('listitem');
-      const metricDiv = card.querySelector('.text-3xl.font-bold.text-blue-600');
+      const benefitsList = screen.getByRole('list', { name: /tax app benefits/i });
+      const cards = within(benefitsList).getAllByRole('listitem');
+      const metricDiv = cards[0].querySelector('.text-3xl.font-bold.text-blue-600');
       expect(metricDiv).not.toBeInTheDocument();
     });
 
