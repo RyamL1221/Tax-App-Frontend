@@ -1,0 +1,1 @@
+// Placeholder for Hero component - will be implemented in task 3.1

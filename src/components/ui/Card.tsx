@@ -1,0 +1,1 @@
+// Placeholder for Card component - will be implemented in task 2.3

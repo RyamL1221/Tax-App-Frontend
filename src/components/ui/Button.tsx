@@ -1,0 +1,1 @@
+// Placeholder for Button component - will be implemented in task 2.1

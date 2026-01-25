@@ -1,0 +1,1 @@
+// Placeholder for CallToAction component - will be implemented in task 3.4
