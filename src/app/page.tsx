@@ -14,22 +14,22 @@ const Hero = dynamic(() => import('@/components/Hero'), {
 
 const Features = dynamic(() => import('@/components/Features'), {
   loading: () => <LoadingFallback message="Loading features..." />,
-  ssr: false // Lazy load below-the-fold content
+  ssr: true // Enable SSR for immediate loading
 });
 
 const Benefits = dynamic(() => import('@/components/Benefits'), {
   loading: () => <LoadingFallback message="Loading benefits..." />,
-  ssr: false
+  ssr: true // Enable SSR for immediate loading
 });
 
 const CallToAction = dynamic(() => import('@/components/CallToAction'), {
   loading: () => <LoadingFallback message="Loading call to action..." />,
-  ssr: false
+  ssr: true // Enable SSR for immediate loading
 });
 
 const Footer = dynamic(() => import('@/components/Footer'), {
   loading: () => <LoadingFallback message="Loading footer..." />,
-  ssr: false
+  ssr: true // Enable SSR for immediate loading
 });
 
 export default function Home() {
