@@ -1,1 +1,41 @@
-// Placeholder for Hero component - will be implemented in task 3.1
+import React from 'react';
+import { Button } from '@/components/ui/Button';
+
+export interface HeroProps {
+  headline?: string;
+  subtitle?: string;
+  ctaText?: string;
+  onCtaClick?: () => void;
+}
+
+const Hero: React.FC<HeroProps> = ({
+  headline = "Streamline Your Tax Preparation with Tax App",
+  subtitle = "Simplify IRS form preparation with our automated data collection and form-filling technology. Save time and reduce errors in your tax filing process.",
+  ctaText = "Start Your Tax Preparation",
+  onCtaClick = () => console.log('CTA clicked')
+}) => {
+  return (
+    <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-16 px-4 sm:py-24 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto text-center">
+        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
+          {headline}
+        </h1>
+        <p className="mt-6 text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          {subtitle}
+        </p>
+        <div className="mt-10">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={onCtaClick}
+            className="px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+          >
+            {ctaText}
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Hero;

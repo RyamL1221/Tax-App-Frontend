@@ -1,5 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import * as fc from 'fast-check';
 import { Card, CardHeader, CardContent, CardFooter, CardProps } from './Card';
 import test from 'node:test';
