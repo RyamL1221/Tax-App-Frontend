@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
+import { navigateToTaxPreparation, navigateToLearnMore, navigateToSupport, handleNavigationError } from '@/lib/navigation';
 
 export interface CallToActionProps {
   primaryText?: string;
@@ -12,12 +13,47 @@ export interface CallToActionProps {
 
 const CallToAction: React.FC<CallToActionProps> = ({
   primaryText = "Start Your Tax Preparation Now",
-  primaryAction = () => console.log('Primary CTA clicked'),
+  primaryAction,
   secondaryText = "Learn More About Our Process",
-  secondaryAction = () => console.log('Secondary CTA clicked'),
+  secondaryAction,
   supportText = "Contact Support",
-  supportAction = () => console.log('Support clicked')
+  supportAction
 }) => {
+  const handlePrimaryClick = async () => {
+    if (primaryAction) {
+      primaryAction();
+      return;
+    }
+    
+    const result = await navigateToTaxPreparation();
+    if (!result.success && result.error) {
+      handleNavigationError(result.error);
+    }
+  };
+
+  const handleSecondaryClick = async () => {
+    if (secondaryAction) {
+      secondaryAction();
+      return;
+    }
+    
+    const result = await navigateToLearnMore();
+    if (!result.success && result.error) {
+      handleNavigationError(result.error);
+    }
+  };
+
+  const handleSupportClick = async () => {
+    if (supportAction) {
+      supportAction();
+      return;
+    }
+    
+    const result = await navigateToSupport();
+    if (!result.success && result.error) {
+      handleNavigationError(result.error);
+    }
+  };
   return (
     <section className="py-16 px-4 sm:py-24 sm:px-6 lg:px-8 bg-blue-600">
       <div className="max-w-4xl mx-auto text-center">
@@ -33,7 +69,7 @@ const CallToAction: React.FC<CallToActionProps> = ({
           <Button
             variant="primary"
             size="lg"
-            onClick={primaryAction}
+            onClick={handlePrimaryClick}
             className="bg-white text-blue-600 hover:bg-gray-50 active:bg-gray-100 px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
           >
             {primaryText}
@@ -42,7 +78,7 @@ const CallToAction: React.FC<CallToActionProps> = ({
           <Button
             variant="outline"
             size="lg"
-            onClick={secondaryAction}
+            onClick={handleSecondaryClick}
             className="border-white text-white hover:bg-white hover:text-blue-600 active:bg-gray-50 px-8 py-4 text-lg font-semibold transition-all duration-200"
           >
             {secondaryText}
@@ -51,7 +87,7 @@ const CallToAction: React.FC<CallToActionProps> = ({
         
         <div className="mt-8">
           <button
-            onClick={supportAction}
+            onClick={handleSupportClick}
             className="text-blue-100 hover:text-white underline text-lg transition-colors duration-200"
           >
             {supportText}
