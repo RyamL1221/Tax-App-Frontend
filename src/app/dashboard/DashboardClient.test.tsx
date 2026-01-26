@@ -15,6 +15,11 @@ jest.mock('@/components/TaxFormSelector', () => ({
   TaxFormSelector: () => <div data-testid="tax-form-selector">Tax Form Selector</div>,
 }));
 
+// Mock LogoutButton component
+jest.mock('@/components/LogoutButton', () => ({
+  LogoutButton: () => <button data-testid="logout-button">Log Out</button>,
+}));
+
 // Mock ErrorBoundary component
 jest.mock('@/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: any) => <div data-testid="error-boundary">{children}</div>,
@@ -71,6 +76,13 @@ describe('DashboardClient', () => {
       expect(helpLink).toBeInTheDocument();
       expect(helpLink).toHaveAttribute('href', '/help');
     });
+
+    it('should render logout button - Requirement 2.1', () => {
+      render(<DashboardClient />);
+
+      const logoutButton = screen.getByTestId('logout-button');
+      expect(logoutButton).toBeInTheDocument();
+    });
   });
 
   describe('Layout Structure - Requirement 5.3', () => {
@@ -95,7 +107,7 @@ describe('DashboardClient', () => {
 
       const cardHeader = screen.getByTestId('card-header');
       expect(cardHeader).toBeInTheDocument();
-      expect(cardHeader).toHaveClass('space-y-2', 'text-center', 'pb-6');
+      expect(cardHeader).toHaveClass('space-y-2', 'pb-6');
     });
 
     it('should render CardContent with proper styling', () => {
@@ -217,6 +229,28 @@ describe('DashboardClient', () => {
       const helpSection = container.querySelector('.mt-6.text-center');
       expect(helpSection).toBeInTheDocument();
       expect(helpSection).toHaveClass('mt-6', 'text-center');
+    });
+
+    it('should position logout button in CardHeader - Requirement 2.2', () => {
+      render(<DashboardClient />);
+
+      const cardHeader = screen.getByTestId('card-header');
+      const logoutButton = screen.getByTestId('logout-button');
+
+      expect(cardHeader).toContainElement(logoutButton);
+    });
+
+    it('should have flex layout with title centered and logout button on right - Requirement 2.2', () => {
+      const { container } = render(<DashboardClient />);
+
+      // Find the flex container
+      const flexContainer = container.querySelector('.flex.items-start.justify-between');
+      expect(flexContainer).toBeInTheDocument();
+
+      // Verify title container is centered
+      const titleContainer = container.querySelector('.flex-1.text-center');
+      expect(titleContainer).toBeInTheDocument();
+      expect(flexContainer).toContainElement(titleContainer!);
     });
   });
 });
