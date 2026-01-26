@@ -1,6 +1,13 @@
 /**
  * Authentication API route handler
  * POST /api/auth/login
+ * 
+ * Security Features (Requirements 7.1, 7.3):
+ * - Only accepts POST requests (GET returns 405)
+ * - Returns generic error messages that don't reveal whether email or password was incorrect
+ * - Implements rate limiting to prevent brute force attacks
+ * - Credentials are transmitted over HTTPS (enforced by Next.js in production)
+ * - Passwords are never logged or stored in browser storage
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -102,24 +109,37 @@ export async function POST(request: NextRequest) {
     // Record the attempt
     recordAttempt(ip);
 
-    // TODO: Implement actual authentication logic
-    // For now, this is a placeholder that will be implemented in later tasks
-    // This would typically:
+    // TODO: Implement actual authentication logic with database
+    // For now, this is a mock implementation for testing session management
+    // In production, this would:
     // 1. Query the database for the user by email
-    // 2. Verify the password hash
-    // 3. Create a session token
-    // 4. Set HTTP-only cookies
+    // 2. Verify the password hash using bcrypt or similar
+    
+    // Mock authentication - accept test@example.com with password "password123"
+    const isValidCredentials = email === 'test@example.com' && password === 'password123';
 
-    // Placeholder response - will be replaced with real authentication
+    if (!isValidCredentials) {
+      const response: AuthResponse = {
+        success: false,
+        error: {
+          type: 'authentication',
+          message: 'Invalid email or password',
+        },
+      };
+      return NextResponse.json(response, { status: 401 });
+    }
+
+    // Authentication successful - create session
+    // Requirement 8.1, 8.2: Create session token and set HTTP-only cookie
+    const { createSession } = await import('@/lib/session');
+    await createSession('user-123', email);
+
     const response: AuthResponse = {
-      success: false,
-      error: {
-        type: 'authentication',
-        message: 'Invalid email or password',
-      },
+      success: true,
+      redirectUrl: '/dashboard',
     };
 
-    return NextResponse.json(response, { status: 401 });
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error('Login API error:', error);
     

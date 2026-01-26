@@ -6,25 +6,27 @@ import { cookies } from 'next/headers';
  * 
  * Check if the user has an active session
  * Returns authentication status
+ * 
+ * Requirements:
+ * - 8.4: Validate session and handle expiration
  */
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session_token');
+    const { getSession } = await import('@/lib/session');
+    const sessionData = await getSession();
 
-    // Check if session token exists
-    if (sessionToken?.value) {
-      // TODO: Validate session token with authentication service
-      // For now, we just check if the token exists
+    // Check if session is valid and not expired
+    if (sessionData) {
       return NextResponse.json({
         authenticated: true,
         session: {
-          token: sessionToken.value,
+          userId: sessionData.userId,
+          email: sessionData.email,
         },
       });
     }
 
-    // No session found
+    // No valid session found or session expired
     return NextResponse.json({
       authenticated: false,
     });

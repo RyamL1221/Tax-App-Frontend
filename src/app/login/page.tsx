@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import LoginPageClient from './LoginPageClient';
 
 /**
@@ -12,6 +11,7 @@ import LoginPageClient from './LoginPageClient';
  * 
  * Requirements:
  * - 8.3: Redirect authenticated users to the dashboard
+ * - 8.4: Handle expired sessions
  * 
  * @returns Login page or redirects to dashboard if authenticated
  */
@@ -20,18 +20,20 @@ export default async function LoginPage({
 }: {
   searchParams: { callbackUrl?: string };
 }) {
-  // Check for existing session token
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get('session_token');
+  // Check for existing valid session
+  const { getSession, clearSession } = await import('@/lib/session');
+  const sessionData = await getSession();
 
   // If user has a valid session, redirect to authenticated area
   // Requirement 8.3: Valid session triggers redirect
-  if (sessionToken?.value) {
-    // TODO: Validate session token with authentication service
-    // For now, we redirect if a session token exists
+  if (sessionData) {
     const redirectUrl = searchParams.callbackUrl || '/dashboard';
     redirect(redirectUrl);
   }
+
+  // If we reach here, either no session exists or it was expired
+  // Expired sessions are automatically handled by getSession returning null
+  // Requirement 8.4: Expired session cleanup happens in getSession validation
 
   // Render the client-side login page
   return <LoginPageClient callbackUrl={searchParams.callbackUrl} />;

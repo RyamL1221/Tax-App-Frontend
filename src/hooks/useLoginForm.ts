@@ -168,6 +168,11 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
   /**
    * Form submission handler
    * Handles authentication API call, rate limiting, and error handling
+   * 
+   * Security Note (Requirement 7.2):
+   * Password data is NEVER stored in localStorage or sessionStorage.
+   * Passwords are only held in memory during form submission and
+   * immediately sent to the server via HTTPS.
    */
   const onSubmit = useCallback(async (data: LoginFormData) => {
     // Clear any previous auth errors

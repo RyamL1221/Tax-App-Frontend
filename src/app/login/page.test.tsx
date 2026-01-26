@@ -10,15 +10,17 @@
 
 import * as fc from 'fast-check';
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
+import type { SessionData } from '@/lib/session';
 
 // Mock Next.js modules
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(),
 }));
 
-jest.mock('next/headers', () => ({
-  cookies: jest.fn(),
+// Mock the session module
+jest.mock('@/lib/session', () => ({
+  getSession: jest.fn(),
+  clearSession: jest.fn(),
 }));
 
 // Mock the LoginPageClient component
@@ -30,6 +32,7 @@ jest.mock('./LoginPageClient', () => {
 
 // Import the page component after mocks are set up
 import LoginPage from './page';
+import { getSession } from '@/lib/session';
 
 describe('Login Page Server Component - Session Redirect', () => {
   beforeEach(() => {
@@ -42,24 +45,24 @@ describe('Login Page Server Component - Session Redirect', () => {
     test('property: any user with a valid session token is redirected to authenticated area', async () => {
       await fc.assert(
         fc.asyncProperty(
-          // Generate arbitrary session tokens (non-empty strings)
-          fc.string({ minLength: 1, maxLength: 100 }),
+          // Generate arbitrary user IDs (non-empty, non-whitespace strings)
+          fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
+          // Generate email addresses
+          fc.emailAddress(),
           // Generate optional callback URLs
           fc.option(fc.webUrl(), { nil: undefined }),
-          async (sessionToken, callbackUrl) => {
+          async (userId, email, callbackUrl) => {
             // Clear mocks before each iteration
             jest.clearAllMocks();
             
-            // Arrange: Mock cookies to return a valid session token
-            const mockCookieStore = {
-              get: jest.fn((name: string) => {
-                if (name === 'session_token') {
-                  return { value: sessionToken };
-                }
-                return undefined;
-              }),
+            // Arrange: Mock getSession to return valid session data
+            const mockSessionData: SessionData = {
+              userId,
+              email,
+              createdAt: Date.now() - 1000,
+              expiresAt: Date.now() + 3600000, // 1 hour from now
             };
-            (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
+            (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
 
             // Mock redirect to track if it was called
             const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
@@ -87,8 +90,8 @@ describe('Login Page Server Component - Session Redirect', () => {
               expect(error.message).toBe('NEXT_REDIRECT');
             }
 
-            // Verify session token was checked
-            expect(mockCookieStore.get).toHaveBeenCalledWith('session_token');
+            // Verify getSession was called
+            expect(getSession).toHaveBeenCalled();
           }
         ),
         { numRuns: 100 }
@@ -104,16 +107,8 @@ describe('Login Page Server Component - Session Redirect', () => {
             // Clear mocks before each iteration
             jest.clearAllMocks();
             
-            // Arrange: Mock cookies to return no session token
-            const mockCookieStore = {
-              get: jest.fn((name: string) => {
-                if (name === 'session_token') {
-                  return undefined; // No session token
-                }
-                return undefined;
-              }),
-            };
-            (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
+            // Arrange: Mock getSession to return null (no session)
+            (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
             // Mock redirect to track if it was called
             const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
@@ -130,15 +125,15 @@ describe('Login Page Server Component - Session Redirect', () => {
             // Should render the login page client
             expect(result).toBeDefined();
             
-            // Verify session token was checked
-            expect(mockCookieStore.get).toHaveBeenCalledWith('session_token');
+            // Verify getSession was called
+            expect(getSession).toHaveBeenCalled();
           }
         ),
         { numRuns: 100 }
       );
     });
 
-    test('property: users with empty session token values are not redirected', async () => {
+    test('property: users with invalid/expired session tokens are not redirected', async () => {
       await fc.assert(
         fc.asyncProperty(
           // Generate optional callback URLs
@@ -147,16 +142,8 @@ describe('Login Page Server Component - Session Redirect', () => {
             // Clear mocks before each iteration
             jest.clearAllMocks();
             
-            // Arrange: Mock cookies to return empty session token
-            const mockCookieStore = {
-              get: jest.fn((name: string) => {
-                if (name === 'session_token') {
-                  return { value: '' }; // Empty session token
-                }
-                return undefined;
-              }),
-            };
-            (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
+            // Arrange: Mock getSession to return null (invalid/expired session)
+            (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
             // Mock redirect to track if it was called
             const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
@@ -167,14 +154,14 @@ describe('Login Page Server Component - Session Redirect', () => {
             // Act: Call the page component
             const result = await LoginPage({ searchParams });
 
-            // Assert: Redirect should NOT have been called (empty string is falsy)
+            // Assert: Redirect should NOT have been called
             expect(mockRedirect).not.toHaveBeenCalled();
             
             // Should render the login page client
             expect(result).toBeDefined();
             
-            // Verify session token was checked
-            expect(mockCookieStore.get).toHaveBeenCalledWith('session_token');
+            // Verify getSession was called
+            expect(getSession).toHaveBeenCalled();
           }
         ),
         { numRuns: 100 }
@@ -184,22 +171,22 @@ describe('Login Page Server Component - Session Redirect', () => {
     test('property: redirect URL defaults to /dashboard when no callbackUrl provided', async () => {
       await fc.assert(
         fc.asyncProperty(
-          // Generate arbitrary session tokens (non-empty strings)
-          fc.string({ minLength: 1, maxLength: 100 }),
-          async (sessionToken) => {
+          // Generate arbitrary user IDs (non-empty, non-whitespace strings)
+          fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
+          // Generate email addresses
+          fc.emailAddress(),
+          async (userId, email) => {
             // Clear mocks before each iteration
             jest.clearAllMocks();
             
-            // Arrange: Mock cookies to return a valid session token
-            const mockCookieStore = {
-              get: jest.fn((name: string) => {
-                if (name === 'session_token') {
-                  return { value: sessionToken };
-                }
-                return undefined;
-              }),
+            // Arrange: Mock getSession to return valid session data
+            const mockSessionData: SessionData = {
+              userId,
+              email,
+              createdAt: Date.now() - 1000,
+              expiresAt: Date.now() + 3600000, // 1 hour from now
             };
-            (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
+            (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
 
             // Mock redirect
             const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
@@ -225,24 +212,24 @@ describe('Login Page Server Component - Session Redirect', () => {
     test('property: redirect URL uses callbackUrl when provided', async () => {
       await fc.assert(
         fc.asyncProperty(
-          // Generate arbitrary session tokens (non-empty strings)
-          fc.string({ minLength: 1, maxLength: 100 }),
+          // Generate arbitrary user IDs (non-empty, non-whitespace strings)
+          fc.string({ minLength: 1, maxLength: 100 }).filter(s => s.trim().length > 0),
+          // Generate email addresses
+          fc.emailAddress(),
           // Generate callback URLs
           fc.webUrl(),
-          async (sessionToken, callbackUrl) => {
+          async (userId, email, callbackUrl) => {
             // Clear mocks before each iteration
             jest.clearAllMocks();
             
-            // Arrange: Mock cookies to return a valid session token
-            const mockCookieStore = {
-              get: jest.fn((name: string) => {
-                if (name === 'session_token') {
-                  return { value: sessionToken };
-                }
-                return undefined;
-              }),
+            // Arrange: Mock getSession to return valid session data
+            const mockSessionData: SessionData = {
+              userId,
+              email,
+              createdAt: Date.now() - 1000,
+              expiresAt: Date.now() + 3600000, // 1 hour from now
             };
-            (cookies as jest.Mock).mockResolvedValue(mockCookieStore);
+            (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
 
             // Mock redirect
             const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
