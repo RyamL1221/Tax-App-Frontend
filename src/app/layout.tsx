@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import NoScriptFallback from "@/components/fallbacks/NoScriptFallback";
+import Navbar from "@/components/Navbar";
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -68,6 +69,7 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased`}>
         <NoScriptFallback>
           <ErrorBoundary>
+            <Navbar />
             <div id="root">
               {children}
             </div>
