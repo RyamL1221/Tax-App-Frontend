@@ -554,7 +554,78 @@ describe('useRateLimit', () => {
 
   // Feature: login-page, Property 15: Rate limiting enforcement
   // **Validates: Requirements 7.4**
+  // Feature: register-page, Property 10: Rate limiter resets after cooldown
+  // **Validates: Requirements 5.4**
   describe('Property-Based Tests', () => {
+    test('property: rate limiter resets after cooldown period allowing new attempts', () => {
+      fc.assert(
+        fc.property(
+          // Generate number of attempts to trigger lock (5-10)
+          fc.integer({ min: 5, max: 10 }),
+          // Generate cooldown wait time (60-65 seconds to ensure window expires)
+          fc.integer({ min: 60000, max: 65000 }),
+          // Generate number of new attempts after reset (1-5)
+          fc.integer({ min: 1, max: 5 }),
+          (initialAttempts, cooldownTime, newAttempts) => {
+            // Reset state before each property test iteration
+            mockSessionStorage.clear();
+            jest.clearAllTimers();
+            jest.useFakeTimers();
+
+            const { result } = renderHook(() => useRateLimit());
+
+            // Make enough attempts to trigger rate limit
+            act(() => {
+              for (let i = 0; i < initialAttempts; i++) {
+                result.current.recordAttempt();
+              }
+            });
+
+            // Verify rate limiter is locked
+            expect(result.current.isLocked).toBe(true);
+            expect(result.current.attempts).toBe(initialAttempts);
+            expect(result.current.remainingTime).toBeGreaterThan(0);
+
+            // Fast forward past the cooldown period
+            act(() => {
+              jest.advanceTimersByTime(cooldownTime);
+            });
+
+            // Wait for the unlock to take effect
+            act(() => {
+              jest.runAllTimers();
+            });
+
+            // After cooldown, rate limiter should be reset
+            expect(result.current.isLocked).toBe(false);
+            expect(result.current.remainingTime).toBe(0);
+            expect(result.current.attempts).toBe(0);
+
+            // Verify new attempts can be made after reset
+            act(() => {
+              for (let i = 0; i < newAttempts; i++) {
+                result.current.recordAttempt();
+              }
+            });
+
+            // New attempts should be tracked in a fresh window
+            expect(result.current.attempts).toBe(newAttempts);
+            // Should not be locked unless new attempts >= 5
+            if (newAttempts >= 5) {
+              expect(result.current.isLocked).toBe(true);
+            } else {
+              expect(result.current.isLocked).toBe(false);
+            }
+
+            // Cleanup
+            jest.runOnlyPendingTimers();
+            jest.useRealTimers();
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
     test('property: after 5 failed attempts within 60-second window, subsequent attempts are blocked until window expires', () => {
       fc.assert(
         fc.property(
