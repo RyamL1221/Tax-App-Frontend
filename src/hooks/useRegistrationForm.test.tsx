@@ -31,7 +31,7 @@ describe('useRegistrationForm Property-Based Tests', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    mockRegister.mockClear();
+    mockRegister.mockReset();
     mockSetLoading.mockClear();
     mockRecordAttempt.mockClear();
     mockResetRateLimit.mockClear();
@@ -703,7 +703,7 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    mockRegister.mockClear();
+    mockRegister.mockReset();
     mockSetLoading.mockClear();
     mockRecordAttempt.mockClear();
     mockResetRateLimit.mockClear();

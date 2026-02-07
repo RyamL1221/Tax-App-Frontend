@@ -265,13 +265,13 @@ describe('RegistrationForm - Integration Tests (Fix Form Submission)', () => {
     });
 
     test('should disable button and show loading state during submission', async () => {
-      // Mock a delayed response
+      // Mock a delayed response with longer delay to ensure we can catch the loading state
       (authService.register as jest.Mock).mockImplementationOnce(
         () => new Promise(resolve => 
           setTimeout(() => resolve({
             message: 'User registered successfully',
             email: 'test@example.com',
-          }), 100)
+          }), 500) // Increased delay to 500ms
         )
       );
 
@@ -287,13 +287,20 @@ describe('RegistrationForm - Integration Tests (Fix Form Submission)', () => {
       await userEvent.type(emailInput, 'test@example.com');
       await userEvent.type(passwordInput, 'SecurePass123!');
       await userEvent.type(confirmPasswordInput, 'SecurePass123!');
+      
+      // Click and immediately check for loading state
       await userEvent.click(submitButton);
 
-      // Verify loading state
+      // Verify loading state appears immediately
       await waitFor(() => {
-        expect(screen.getByText(/creating account/i)).toBeInTheDocument();
+        // Check for status message by finding the text within the status messages
+        const statusMessages = screen.getAllByRole('status');
+        const creatingAccountMessage = statusMessages.find(el => 
+          el.textContent?.includes('Creating account')
+        );
+        expect(creatingAccountMessage).toBeDefined();
         expect(submitButton).toBeDisabled();
-      });
+      }, { timeout: 100 }); // Check quickly before API resolves
 
       // Wait for completion
       await waitFor(() => {

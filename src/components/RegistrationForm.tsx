@@ -7,6 +7,7 @@ import { EmailInput } from '@/components/ui/EmailInput';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { PasswordStrengthIndicator } from '@/components/ui/PasswordStrengthIndicator';
 import { PasswordRequirements } from '@/components/ui/PasswordRequirements';
+import { StatusMessage } from '@/components/ui/StatusMessage';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,9 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
     handleChange,
     handleBlur,
     handleSubmit,
+    statusMessage,
+    statusType,
+    clearStatus,
   } = useRegistrationForm({ onSuccess });
 
   // Local state for password visibility toggles
@@ -113,6 +117,15 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
             <p className="text-sm text-red-800">{errors.general}</p>
           </div>
         </div>
+      )}
+
+      {/* Status Message */}
+      {statusMessage && statusType && (
+        <StatusMessage
+          message={statusMessage}
+          type={statusType}
+          onClear={clearStatus}
+        />
       )}
 
       {/* Full Name Input */}

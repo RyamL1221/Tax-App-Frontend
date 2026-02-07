@@ -56,6 +56,9 @@ export interface UseRegistrationFormReturn {
   handleBlur: (e: FocusEvent<HTMLInputElement>) => void;
   handleSubmit: (e: FormEvent<HTMLFormElement>) => Promise<void>;
   clearError: (field: keyof RegistrationFormErrors) => void;
+  statusMessage: string | null;
+  statusType: 'success' | 'error' | 'info' | null;
+  clearStatus: () => void;
 }
 
 /**
@@ -112,6 +115,10 @@ export function useRegistrationForm(
   // Validation errors state
   const [errors, setErrors] = useState<RegistrationFormErrors>({});
 
+  // Status message state
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusType, setStatusType] = useState<'success' | 'error' | 'info' | null>(null);
+
   // Loading state management
   const { isLoading, setLoading } = useLoadingState();
 
@@ -134,6 +141,15 @@ export function useRegistrationForm(
     : '';
 
   /**
+   * Clear status message
+   * Requirements: 4.2
+   */
+  const clearStatus = useCallback(() => {
+    setStatusMessage(null);
+    setStatusType(null);
+  }, []);
+
+  /**
    * Handle input field changes
    * Updates form data and clears field errors
    * Requirements: 1.1, 9.5
@@ -142,6 +158,9 @@ export function useRegistrationForm(
     const { name, value } = e.target;
     
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear status message when user types
+    clearStatus();
     
     // Clear error for this field when user starts typing
     if (errors[name as keyof RegistrationFormErrors]) {
@@ -160,7 +179,7 @@ export function useRegistrationForm(
         return newErrors;
       });
     }
-  }, [errors]);
+  }, [errors, clearStatus]);
 
   /**
    * Validate a single field
@@ -283,6 +302,10 @@ export function useRegistrationForm(
     
     console.log(`[${timestamp}] ✅ Validation passed, proceeding with API call`);
 
+    // Set status to "Creating account..." when submission starts
+    setStatusMessage('Creating account...');
+    setStatusType('info');
+
     // Start loading state
     setLoading(true);
     
@@ -298,13 +321,18 @@ export function useRegistrationForm(
       });
       
       // Use authService instead of fetch
-      await authService.register({
+      const response = await authService.register({
         email: formData.email,
         name: formData.fullName,
         password: formData.password
       });
 
       console.log(`[${timestamp}] ✅ API call successful`);
+      
+      // Set status to API success message
+      setStatusMessage(response.message || 'User registered successfully');
+      setStatusType('success');
+      
       // Success - reset rate limit and call success callback
       resetRateLimit();
       if (onSuccess) {
@@ -315,6 +343,10 @@ export function useRegistrationForm(
       console.log(`[${timestamp}] ❌ API call failed:`, error);
       // Handle API errors
       if (isApiError(error)) {
+        // Set status to API error message
+        setStatusMessage(error.message || 'Registration failed. Please try again.');
+        setStatusType('error');
+        
         if (error.status === 409) {
           // Email already exists
           setErrors(prev => ({
@@ -329,7 +361,10 @@ export function useRegistrationForm(
           }));
         }
       } else {
-        // Network error
+        // Network error - set status to network error message
+        setStatusMessage('Network error. Please check your connection and try again.');
+        setStatusType('error');
+        
         setErrors(prev => ({
           ...prev,
           general: 'Network error. Please check your connection and try again.'
@@ -375,7 +410,10 @@ export function useRegistrationForm(
     handleChange,
     handleBlur,
     handleSubmit,
-    clearError
+    clearError,
+    statusMessage,
+    statusType,
+    clearStatus
   };
 }
 
