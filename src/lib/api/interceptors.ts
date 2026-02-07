@@ -47,14 +47,14 @@ export function authRequestInterceptor(config: RequestConfig): RequestConfig {
  * Response interceptor that handles authentication failures
  * 
  * This interceptor detects 401 Unauthorized responses and automatically
- * clears stored tokens and redirects to the login page (in browser environments).
- * This ensures that expired or invalid tokens are removed and users are
- * prompted to re-authenticate.
+ * clears stored tokens and redirects to the login page with an expiration
+ * message (in browser environments). This ensures that expired or invalid
+ * tokens are removed and users are prompted to re-authenticate.
  * 
  * @param response - The HTTP response
  * @returns The unmodified response (after handling 401 errors)
  * 
- * Requirements: 6.2, 6.3
+ * Requirements: 5.1, 5.2, 5.3, 5.5
  */
 export async function authResponseInterceptor(response: Response): Promise<Response> {
   // Handle 401 Unauthorized responses
@@ -62,9 +62,9 @@ export async function authResponseInterceptor(response: Response): Promise<Respo
     // Clear the stored token immediately
     tokenManager.clearToken();
     
-    // Redirect to login page (only in browser environment)
+    // Redirect to login page with expired parameter (only in browser environment)
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      window.location.href = '/login?expired=true';
     }
   }
 

@@ -53,6 +53,7 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
     test('should complete full flow from button click to API call to navigation', async () => {
       // Mock successful login with a slight delay to see loading state
       const mockLoginResponse = {
+        success: true,
         token: 'mock-jwt-token',
         email: 'test@example.com',
         userId: 'user-123',
@@ -85,12 +86,15 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
       // Click the submit button
       await userEvent.click(submitButton);
 
-      // Verify API client was called with correct credentials
+      // Verify API client was called with correct credentials and status callback
       await waitFor(() => {
-        expect(authService.login).toHaveBeenCalledWith({
-          email: 'test@example.com',
-          password: 'SecurePass123!',
-        });
+        expect(authService.login).toHaveBeenCalledWith(
+          {
+            email: 'test@example.com',
+            password: 'SecurePass123!',
+          },
+          expect.any(Function) // Status callback
+        );
       });
 
       // Verify success callback was called (which triggers navigation)
@@ -105,6 +109,7 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
     test('should prevent default form submission behavior', async () => {
       // Mock successful login
       (authService.login as jest.Mock).mockResolvedValueOnce({
+        success: true,
         token: 'mock-token',
         email: 'test@example.com',
         userId: 'user-123',
@@ -145,6 +150,7 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
     test('should trigger form submission when submit button is clicked', async () => {
       // Mock successful login
       (authService.login as jest.Mock).mockResolvedValueOnce({
+        success: true,
         token: 'mock-token',
         email: 'test@example.com',
         userId: 'user-123',
@@ -165,10 +171,13 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
 
       // Verify the form submission was triggered and API was called
       await waitFor(() => {
-        expect(authService.login).toHaveBeenCalledWith({
-          email: 'test@example.com',
-          password: 'SecurePass123!',
-        });
+        expect(authService.login).toHaveBeenCalledWith(
+          {
+            email: 'test@example.com',
+            password: 'SecurePass123!',
+          },
+          expect.any(Function) // Status callback
+        );
       });
 
       // Verify success callback was called
@@ -255,6 +264,7 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
       (authService.login as jest.Mock).mockImplementationOnce(
         () => new Promise(resolve => 
           setTimeout(() => resolve({
+            success: true,
             token: 'mock-token',
             email: 'test@example.com',
             userId: 'user-123',
@@ -274,7 +284,7 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
 
       // Verify loading state
       await waitFor(() => {
-        expect(screen.getByText(/signing in/i)).toBeInTheDocument();
+        expect(screen.getByText(/logging in/i)).toBeInTheDocument();
         expect(submitButton).toBeDisabled();
       });
 
@@ -289,6 +299,7 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
       (authService.login as jest.Mock).mockImplementationOnce(
         () => new Promise(resolve => 
           setTimeout(() => resolve({
+            success: true,
             token: 'mock-token',
             email: 'test@example.com',
             userId: 'user-123',

@@ -78,6 +78,7 @@ describe('LoginForm - Property-Based Tests', () => {
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
+          status: { state: 'idle', message: '' },
           });
 
           const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -136,6 +137,7 @@ describe('LoginForm - Property-Based Tests', () => {
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
+          status: { state: 'idle', message: '' },
           });
 
           const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -195,6 +197,7 @@ describe('LoginForm - Property-Based Tests', () => {
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
+          status: { state: 'idle', message: '' },
           });
 
           const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -245,6 +248,7 @@ describe('LoginForm - Property-Based Tests', () => {
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
+          status: { state: 'idle', message: '' },
           });
 
           const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);

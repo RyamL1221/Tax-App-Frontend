@@ -6,7 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@/lib/validation';
 import { LoginFormData, AuthError } from '@/types/auth';
 import { useRateLimit } from './useRateLimit';
-import { authService, isApiError } from '@/lib/api';
+import { authService } from '@/lib/api';
+import { LoginStatus } from '@/lib/api/types';
 
 /**
  * Options for configuring the useLoginForm hook
@@ -81,6 +82,11 @@ export interface UseLoginFormReturn {
    * Clear field errors when user starts typing
    */
   clearFieldError: (field: keyof LoginFormData) => void;
+  
+  /**
+   * Current login status for verbose feedback
+   */
+  status: LoginStatus;
 }
 
 /**
@@ -140,6 +146,9 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
   // General authentication error (not field-specific)
   const [authError, setAuthError] = useState<string | null>(null);
   
+  // Login status state for verbose feedback
+  const [status, setStatus] = useState<LoginStatus>({ state: 'idle', message: '' });
+  
   // Rate limiting hook
   const {
     isLocked: isRateLimited,
@@ -160,11 +169,14 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
    */
   const clearFieldError = useCallback((field: keyof LoginFormData) => {
     clearErrors(field);
-    // Also clear general auth error when user starts typing
+    // Also clear general auth error and reset status when user starts typing
     if (authError) {
       setAuthError(null);
     }
-  }, [clearErrors, authError]);
+    if (status.state !== 'idle') {
+      setStatus({ state: 'idle', message: '' });
+    }
+  }, [clearErrors, authError, status.state]);
   
   /**
    * Form submission handler
@@ -183,8 +195,9 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
       console.log('Default behavior prevented');
     }
     
-    // Clear any previous auth errors
+    // Clear any previous auth errors and reset status
     setAuthError(null);
+    setStatus({ state: 'idle', message: '' });
     
     // Check rate limit before attempting
     if (isRateLimited) {
@@ -193,6 +206,7 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
         message: `Too many attempts. Please wait ${rateLimitRemainingTime} seconds before trying again`,
       };
       setAuthError(error.message);
+      setStatus({ state: 'error', message: error.message });
       if (onError) {
         onError(error);
       }
@@ -200,46 +214,64 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     }
     
     try {
-      // Call authentication API using authService (Requirement 9.3)
+      // Call authentication API using authService with status callback (Requirement 9.3)
       console.log('Calling API client login method');
-      await authService.login({
-        email: data.email,
-        password: data.password
-      });
+      const result = await authService.login(
+        {
+          email: data.email,
+          password: data.password
+        },
+        (newStatus) => {
+          // Update status state with callback from authService
+          setStatus(newStatus);
+        }
+      );
       
-      // Token is automatically stored by authService
-      // Success - reset rate limit and redirect to dashboard (Requirement 9.4)
-      console.log('API call successful');
-      resetRateLimit();
-      if (onSuccess) {
-        onSuccess('/dashboard');
-      }
-    } catch (error) {
-      // Handle API errors (Requirement 9.5)
-      console.error('API call failed:', error);
-      if (isApiError(error)) {
-        // Record attempt for authentication errors (401)
-        if (error.status === 401) {
+      // Check if login was successful
+      if (result.success) {
+        // Token is automatically stored by authService
+        // Success - reset rate limit and redirect to dashboard (Requirement 9.4)
+        console.log('API call successful');
+        resetRateLimit();
+        
+        // Clear error messages before redirect (Requirement 7.5)
+        setAuthError(null);
+        
+        // Wait 500ms to show success message before redirecting (Requirement 7.1, 7.2)
+        setTimeout(() => {
+          if (onSuccess) {
+            onSuccess('/dashboard');
+          }
+        }, 500);
+      } else {
+        // Login failed - handle error
+        console.error('Login failed:', result.error);
+        
+        // Record attempt for authentication errors
+        if (result.error === 'Invalid email or password') {
           recordAttempt();
         }
         
-        setAuthError(error.message);
+        setAuthError(result.error || 'Login failed');
+        // Status is already set by the callback
         if (onError) {
           onError({
             type: 'authentication',
-            message: error.message
+            message: result.error || 'Login failed'
           });
         }
-      } else {
-        // Network error or other exception
-        const authErrorObj: AuthError = {
-          type: 'network',
-          message: 'Unable to connect. Please check your connection and try again',
-        };
-        setAuthError(authErrorObj.message);
-        if (onError) {
-          onError(authErrorObj);
-        }
+      }
+    } catch (error) {
+      // Handle unexpected errors (Requirement 9.5)
+      console.error('Unexpected error during login:', error);
+      const authErrorObj: AuthError = {
+        type: 'network',
+        message: 'Unable to connect. Please check your connection and try again',
+      };
+      setAuthError(authErrorObj.message);
+      setStatus({ state: 'error', message: authErrorObj.message });
+      if (onError) {
+        onError(authErrorObj);
       }
     }
   }, [
@@ -263,6 +295,7 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     isRateLimited,
     rateLimitRemainingTime,
     clearFieldError,
+    status,
   };
 }
 

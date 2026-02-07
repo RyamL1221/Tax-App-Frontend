@@ -3,12 +3,11 @@
  * 
  * Tests verify:
  * - Component rendering with correct text and variant
- * - Loading state display during logout
- * - Error message display
- * - Button disabled state during loading
  * - Click handler invocation
  * - Keyboard accessibility
  * - ARIA attributes
+ * - Client-side logout (no API calls)
+ * - Immediate redirect to login page
  */
 
 import React from 'react';
@@ -16,24 +15,39 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LogoutButton } from './LogoutButton';
 
-// Mock the useLogout hook
-jest.mock('@/hooks/useLogout');
-import { useLogout } from '@/hooks/useLogout';
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
 
-const mockUseLogout = useLogout as jest.MockedFunction<typeof useLogout>;
+// Mock authService
+jest.mock('@/lib/api', () => ({
+  authService: {
+    logout: jest.fn(),
+  },
+}));
+
+import { useRouter } from 'next/navigation';
+import { authService } from '@/lib/api';
+
+const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+const mockLogout = authService.logout as jest.MockedFunction<typeof authService.logout>;
 
 describe('LogoutButton', () => {
-  const mockHandleLogout = jest.fn();
+  const mockPush = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Default mock implementation
-    mockUseLogout.mockReturnValue({
-      isLoading: false,
-      error: null,
-      handleLogout: mockHandleLogout,
-    });
+    // Mock useRouter
+    mockUseRouter.mockReturnValue({
+      push: mockPush,
+      replace: jest.fn(),
+      refresh: jest.fn(),
+      back: jest.fn(),
+      forward: jest.fn(),
+      prefetch: jest.fn(),
+    } as any);
   });
 
   describe('Component Rendering', () => {
@@ -55,10 +69,10 @@ describe('LogoutButton', () => {
     });
 
     it('should accept optional className prop', () => {
-      const { container } = render(<LogoutButton className="custom-class" />);
+      render(<LogoutButton className="custom-class" />);
 
-      const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass('custom-class');
+      const button = screen.getByRole('button', { name: /log out/i });
+      expect(button).toHaveClass('custom-class');
     });
 
     it('should have ARIA label for accessibility', () => {
@@ -67,50 +81,8 @@ describe('LogoutButton', () => {
       const button = screen.getByRole('button', { name: /log out/i });
       expect(button).toHaveAttribute('aria-label', 'Log out of your account');
     });
-  });
 
-  describe('Loading State', () => {
-    it('should display "Logging out..." text during logout', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const button = screen.getByRole('button', { name: /log out of your account/i });
-      expect(button).toBeInTheDocument();
-      expect(button).toHaveTextContent('Logging out...');
-    });
-
-    it('should be disabled during loading', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const button = screen.getByRole('button', { name: /log out of your account/i });
-      expect(button).toBeDisabled();
-    });
-
-    it('should show loading indicator during logout', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const button = screen.getByRole('button', { name: /log out of your account/i });
-      expect(button).toHaveAttribute('aria-busy', 'true');
-    });
-
-    it('should not be disabled when not loading', () => {
+    it('should not be disabled', () => {
       render(<LogoutButton />);
 
       const button = screen.getByRole('button', { name: /log out/i });
@@ -118,86 +90,61 @@ describe('LogoutButton', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should display error message when error exists', () => {
-      const errorMessage = 'Failed to log out. Please try again.';
-      mockUseLogout.mockReturnValue({
-        isLoading: false,
-        error: errorMessage,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const errorElement = screen.getByRole('alert');
-      expect(errorElement).toBeInTheDocument();
-      expect(errorElement).toHaveTextContent(errorMessage);
-    });
-
-    it('should have proper ARIA attributes on error message', () => {
-      const errorMessage = 'Failed to log out. Please try again.';
-      mockUseLogout.mockReturnValue({
-        isLoading: false,
-        error: errorMessage,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const errorElement = screen.getByRole('alert');
-      expect(errorElement).toHaveAttribute('role', 'alert');
-      expect(errorElement).toHaveAttribute('aria-live', 'polite');
-    });
-
-    it('should not display error message when error is null', () => {
-      render(<LogoutButton />);
-
-      const errorElement = screen.queryByRole('alert');
-      expect(errorElement).not.toBeInTheDocument();
-    });
-
-    it('should display network error message', () => {
-      const errorMessage = 'Failed to log out. Please check your connection and try again.';
-      mockUseLogout.mockReturnValue({
-        isLoading: false,
-        error: errorMessage,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      expect(screen.getByText(errorMessage)).toBeInTheDocument();
-    });
-  });
-
-  describe('User Interaction', () => {
-    it('should call handleLogout when clicked', async () => {
+  describe('Logout Functionality', () => {
+    it('should call authService.logout when clicked', async () => {
       const user = userEvent.setup();
       render(<LogoutButton />);
 
       const button = screen.getByRole('button', { name: /log out/i });
       await user.click(button);
 
-      expect(mockHandleLogout).toHaveBeenCalledTimes(1);
+      expect(mockLogout).toHaveBeenCalledTimes(1);
     });
 
-    it('should not call handleLogout when disabled', async () => {
+    it('should redirect to login page when clicked', async () => {
       const user = userEvent.setup();
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
+      render(<LogoutButton />);
+
+      const button = screen.getByRole('button', { name: /log out/i });
+      await user.click(button);
+
+      expect(mockPush).toHaveBeenCalledWith('/login');
+    });
+
+    it('should call logout before redirect', async () => {
+      const user = userEvent.setup();
+      const callOrder: string[] = [];
+
+      mockLogout.mockImplementation(() => {
+        callOrder.push('logout');
+      });
+
+      mockPush.mockImplementation(() => {
+        callOrder.push('redirect');
       });
 
       render(<LogoutButton />);
 
-      const button = screen.getByRole('button', { name: /log out of your account/i });
-      
-      // Attempt to click disabled button
+      const button = screen.getByRole('button', { name: /log out/i });
       await user.click(button);
 
-      // handleLogout should not be called because button is disabled
-      expect(mockHandleLogout).not.toHaveBeenCalled();
+      expect(callOrder).toEqual(['logout', 'redirect']);
+    });
+
+    it('should not display any error messages', () => {
+      render(<LogoutButton />);
+
+      const errorElement = screen.queryByRole('alert');
+      expect(errorElement).not.toBeInTheDocument();
+    });
+
+    it('should not display any loading state', () => {
+      render(<LogoutButton />);
+
+      const button = screen.getByRole('button', { name: /log out/i });
+      expect(button).toHaveTextContent('Log Out');
+      expect(button).not.toHaveTextContent('Logging out');
+      expect(button).not.toBeDisabled();
     });
   });
 
@@ -223,7 +170,8 @@ describe('LogoutButton', () => {
       // Press Enter
       await user.keyboard('{Enter}');
 
-      expect(mockHandleLogout).toHaveBeenCalledTimes(1);
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith('/login');
     });
 
     it('should be activatable via Space key', async () => {
@@ -236,23 +184,8 @@ describe('LogoutButton', () => {
       // Press Space
       await user.keyboard(' ');
 
-      expect(mockHandleLogout).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not be focusable when disabled', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const button = screen.getByRole('button', { name: /log out of your account/i });
-      
-      // Disabled buttons should not be focusable
-      expect(button).toBeDisabled();
-      expect(button).toHaveClass('disabled:pointer-events-none');
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith('/login');
     });
   });
 
@@ -269,101 +202,6 @@ describe('LogoutButton', () => {
 
       const button = screen.getByRole('button', { name: /log out/i });
       expect(button).toHaveAttribute('aria-label', 'Log out of your account');
-    });
-
-    it('should have aria-busy attribute when loading', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-
-      render(<LogoutButton />);
-
-      const button = screen.getByRole('button', { name: /log out of your account/i });
-      expect(button).toHaveAttribute('aria-busy', 'true');
-    });
-
-    it('should not have aria-busy attribute when not loading', () => {
-      render(<LogoutButton />);
-
-      const button = screen.getByRole('button', { name: /log out/i });
-      // aria-busy should be false or not present when not loading
-      const ariaBusy = button.getAttribute('aria-busy');
-      expect(ariaBusy === null || ariaBusy === 'false').toBe(true);
-    });
-  });
-
-  describe('State Transitions', () => {
-    it('should transition from normal to loading state', () => {
-      const { rerender } = render(<LogoutButton />);
-
-      // Initial state
-      let button = screen.getByRole('button', { name: /log out/i });
-      expect(button).toHaveTextContent('Log Out');
-      expect(button).not.toBeDisabled();
-
-      // Update to loading state
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-      rerender(<LogoutButton />);
-
-      button = screen.getByRole('button', { name: /log out of your account/i });
-      expect(button).toHaveTextContent('Logging out...');
-      expect(button).toBeDisabled();
-    });
-
-    it('should transition from loading to error state', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: true,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-
-      const { rerender } = render(<LogoutButton />);
-
-      // Loading state
-      let button = screen.getByRole('button', { name: /log out of your account/i });
-      expect(button).toBeDisabled();
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-
-      // Update to error state
-      mockUseLogout.mockReturnValue({
-        isLoading: false,
-        error: 'Failed to log out. Please try again.',
-        handleLogout: mockHandleLogout,
-      });
-      rerender(<LogoutButton />);
-
-      button = screen.getByRole('button', { name: /log out/i });
-      expect(button).not.toBeDisabled();
-      expect(screen.getByRole('alert')).toBeInTheDocument();
-    });
-
-    it('should transition from error back to normal state', () => {
-      mockUseLogout.mockReturnValue({
-        isLoading: false,
-        error: 'Failed to log out. Please try again.',
-        handleLogout: mockHandleLogout,
-      });
-
-      const { rerender } = render(<LogoutButton />);
-
-      // Error state
-      expect(screen.getByRole('alert')).toBeInTheDocument();
-
-      // Update to normal state (error cleared)
-      mockUseLogout.mockReturnValue({
-        isLoading: false,
-        error: null,
-        handleLogout: mockHandleLogout,
-      });
-      rerender(<LogoutButton />);
-
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 });

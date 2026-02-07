@@ -18,7 +18,7 @@ import LoginPageClient from './LoginPageClient';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { callbackUrl?: string };
+  searchParams: { callbackUrl?: string; expired?: string };
 }) {
   // Check for existing valid session
   const { getSession, clearSession } = await import('@/lib/session');
@@ -36,7 +36,11 @@ export default async function LoginPage({
   // Requirement 8.4: Expired session cleanup happens in getSession validation
 
   // Render the client-side login page
-  return <LoginPageClient callbackUrl={searchParams.callbackUrl} />;
+  // Pass expired parameter to show session expiration message
+  return <LoginPageClient 
+    callbackUrl={searchParams.callbackUrl}
+    expired={searchParams.expired === 'true'}
+  />;
 }
 
 /**

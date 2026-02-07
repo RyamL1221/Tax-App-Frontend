@@ -20,6 +20,8 @@ import {
   RegisterResponse,
   LoginRequest,
   LoginResponse,
+  LoginStatus,
+  LoginResult,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   ResetPasswordRequest,
@@ -84,39 +86,82 @@ export class AuthService {
    * 
    * Validates email format and password length before making the API call.
    * On success, stores the returned JWT token via TokenManager.
+   * Provides status updates via optional callback for UI feedback.
    * 
    * @param data - Login credentials containing email and password
-   * @returns Promise resolving to LoginResponse with token, email, and userId
-   * @throws ApiError if validation fails or API request fails
+   * @param onStatusChange - Optional callback for status updates during login flow
+   * @returns Promise resolving to LoginResult with success status and user data or error
    * 
-   * Requirements: 3.3, 3.4, 3.5
+   * Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6
    */
-  async login(data: LoginRequest): Promise<LoginResponse> {
-    // Validate email format
-    const emailValidation = Validators.validateEmail(data.email);
-    if (!emailValidation.isValid) {
-      throw {
-        status: 400,
-        message: emailValidation.error || 'Invalid email format'
+  async login(
+    data: LoginRequest,
+    onStatusChange?: (status: LoginStatus) => void
+  ): Promise<LoginResult> {
+    try {
+      // Validate email format
+      const emailValidation = Validators.validateEmail(data.email);
+      if (!emailValidation.isValid) {
+        const errorMessage = emailValidation.error || 'Invalid email format';
+        onStatusChange?.({ state: 'error', message: errorMessage });
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+
+      // Validate password length
+      const passwordValidation = Validators.validatePassword(data.password);
+      if (!passwordValidation.isValid) {
+        const errorMessage = passwordValidation.error || 'Invalid password';
+        onStatusChange?.({ state: 'error', message: errorMessage });
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+
+      // Notify authenticating state
+      onStatusChange?.({ state: 'authenticating', message: 'Authenticating...' });
+
+      // Make API request
+      const response = await this.apiClient.post<LoginResponse>('/auth/login', data);
+
+      // Store the JWT token
+      this.tokenManager.setToken(response.token);
+
+      // Notify success state
+      onStatusChange?.({ state: 'success', message: 'Login successful!' });
+
+      return {
+        success: true,
+        token: response.token,
+        email: response.email,
+        userId: response.userId
+      };
+    } catch (error: any) {
+      // Parse error and map to user-friendly message
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+
+      if (error.status === 401) {
+        errorMessage = 'Invalid email or password';
+      } else if (error.status === 400) {
+        // Use backend validation message
+        errorMessage = error.message || 'Invalid request';
+      } else if (error.message === 'Network Error' || error.code === 'ECONNABORTED' || !error.status) {
+        errorMessage = 'Unable to connect. Please check your internet connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Notify error state
+      onStatusChange?.({ state: 'error', message: errorMessage });
+
+      return {
+        success: false,
+        error: errorMessage
       };
     }
-
-    // Validate password length
-    const passwordValidation = Validators.validatePassword(data.password);
-    if (!passwordValidation.isValid) {
-      throw {
-        status: 400,
-        message: passwordValidation.error || 'Invalid password'
-      };
-    }
-
-    // Make API request
-    const response = await this.apiClient.post<LoginResponse>('/auth/login', data);
-
-    // Store the JWT token
-    this.tokenManager.setToken(response.token);
-
-    return response;
   }
 
   /**
@@ -181,8 +226,9 @@ export class AuthService {
    * 
    * Clears the stored JWT token. No API call is required since JWT tokens
    * are stateless and expire automatically after 24 hours.
+   * This is a synchronous, client-side only operation.
    * 
-   * Requirements: 3.8
+   * Requirements: 4.1, 4.3, 4.5
    */
   logout(): void {
     this.tokenManager.clearToken();

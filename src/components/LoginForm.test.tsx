@@ -42,6 +42,7 @@ describe('LoginForm', () => {
       isRateLimited: false,
       rateLimitRemainingTime: 0,
       clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
     });
   });
 
@@ -95,6 +96,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+        status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -125,6 +127,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+        status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -148,6 +151,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -172,6 +176,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -198,13 +203,14 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
 
       const emailInput = screen.getByLabelText(/email address/i);
       const passwordInput = screen.getByLabelText(/^password$/i);
-      const submitButton = screen.getByRole('button', { name: /signing in/i });
+      const submitButton = screen.getByRole('button', { name: /logging in/i });
 
       expect(emailInput).toBeDisabled();
       expect(passwordInput).toBeDisabled();
@@ -224,11 +230,12 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
 
-      const submitButton = screen.getByRole('button', { name: /signing in/i });
+      const submitButton = screen.getByRole('button', { name: /logging in/i });
       expect(submitButton).toHaveAttribute('aria-busy', 'true');
     });
 
@@ -245,6 +252,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -273,6 +281,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -309,6 +318,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -350,6 +360,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -393,6 +404,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -463,6 +475,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -533,6 +546,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -577,6 +591,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -601,6 +616,7 @@ describe('LoginForm', () => {
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -627,6 +643,7 @@ describe('LoginForm', () => {
         isRateLimited: true,
         rateLimitRemainingTime: 45,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -653,6 +670,7 @@ describe('LoginForm', () => {
         isRateLimited: true,
         rateLimitRemainingTime: 45,
         clearFieldError: mockClearFieldError,
+      status: { state: 'idle', message: '' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -771,6 +789,7 @@ describe('LoginForm', () => {
               isRateLimited: false,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
+            status: { state: 'idle', message: '' },
             });
             
             const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -890,6 +909,7 @@ describe('LoginForm', () => {
               isRateLimited: formState.isRateLimited,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
+            status: { state: 'idle', message: '' },
             });
             
             const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -936,7 +956,7 @@ describe('LoginForm', () => {
               expect(passwordInput).toHaveAttribute('autocomplete', 'current-password');
               
               // Property: Submit button must have proper accessibility attributes
-              const submitButton = screen.getByRole('button', { name: formState.isSubmitting ? /signing in/i : /sign in/i });
+              const submitButton = screen.getByRole('button', { name: formState.isSubmitting ? /logging in/i : /sign in/i });
               
               // Must have type="submit"
               expect(submitButton).toHaveAttribute('type', 'submit');
@@ -1030,6 +1050,7 @@ describe('LoginForm', () => {
               isRateLimited: false,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
+            status: { state: 'idle', message: '' },
             });
             
             const user = userEvent.setup();
@@ -1099,6 +1120,7 @@ describe('LoginForm', () => {
               isRateLimited: false,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
+            status: { state: 'idle', message: '' },
             });
             
             const { unmount, container } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -1162,6 +1184,7 @@ describe('LoginForm', () => {
               isRateLimited: formState.isRateLimited,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
+            status: { state: 'idle', message: '' },
             });
             
             const user = userEvent.setup();

@@ -1,9 +1,10 @@
 /**
  * Unit tests for TokenManager
- * Tests token storage, retrieval, clearing, and security requirements
+ * Tests token storage, retrieval, clearing, validation, and security requirements
+ * Requirements: 1.1, 1.3, 1.4, 1.5, 6.2, 8.2, 8.3
  */
 
-import { TokenManager } from './tokenManager';
+import { TokenManager, setToken, getToken, clearToken, hasToken, isValidToken } from './tokenManager';
 
 describe('TokenManager', () => {
   let tokenManager: TokenManager;
@@ -29,19 +30,69 @@ describe('TokenManager', () => {
     consoleWarnSpy.mockRestore();
   });
 
+  describe('isValidToken', () => {
+    it('should return true for valid non-empty string tokens', () => {
+      expect(isValidToken('valid-token')).toBe(true);
+      expect(isValidToken('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token')).toBe(true);
+    });
+
+    it('should return false for null', () => {
+      expect(isValidToken(null)).toBe(false);
+    });
+
+    it('should return false for empty string', () => {
+      expect(isValidToken('')).toBe(false);
+    });
+
+    it('should return false for whitespace-only string', () => {
+      expect(isValidToken('   ')).toBe(false);
+      expect(isValidToken('\t\n')).toBe(false);
+    });
+
+    it('should return true for token with leading/trailing whitespace', () => {
+      expect(isValidToken('  token  ')).toBe(true);
+    });
+  });
+
   describe('setToken', () => {
-    it('should store a token in localStorage', () => {
+    it('should store a valid token in localStorage with correct key', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
       
-      tokenManager.setToken(token);
+      setToken(token);
       
-      expect(localStorage.getItem('tax_app_jwt_token')).toBe(token);
+      expect(localStorage.getItem('jwt_token')).toBe(token);
+    });
+
+    it('should trim whitespace from token before storing', () => {
+      const token = '  token-with-spaces  ';
+      
+      setToken(token);
+      
+      expect(localStorage.getItem('jwt_token')).toBe('token-with-spaces');
+    });
+
+    it('should not store invalid tokens (empty string)', () => {
+      setToken('');
+      
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('invalid token')
+      );
+    });
+
+    it('should not store invalid tokens (whitespace only)', () => {
+      setToken('   ');
+      
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('invalid token')
+      );
     });
 
     it('should not log the token value to console', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
       
-      tokenManager.setToken(token);
+      setToken(token);
       
       // Check that token was not logged
       expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
@@ -53,87 +104,165 @@ describe('TokenManager', () => {
       const token1 = 'token1';
       const token2 = 'token2';
       
-      tokenManager.setToken(token1);
-      tokenManager.setToken(token2);
+      setToken(token1);
+      setToken(token2);
       
-      expect(localStorage.getItem('tax_app_jwt_token')).toBe(token2);
+      expect(localStorage.getItem('jwt_token')).toBe(token2);
+    });
+
+    it('should work with TokenManager class instance', () => {
+      const token = 'test-token';
+      
+      tokenManager.setToken(token);
+      
+      expect(localStorage.getItem('jwt_token')).toBe(token);
     });
   });
 
   describe('getToken', () => {
-    it('should retrieve a stored token', () => {
+    it('should retrieve a stored valid token', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
-      localStorage.setItem('tax_app_jwt_token', token);
+      localStorage.setItem('jwt_token', token);
       
-      const retrieved = tokenManager.getToken();
+      const retrieved = getToken();
       
       expect(retrieved).toBe(token);
     });
 
     it('should return null when no token is stored', () => {
-      const retrieved = tokenManager.getToken();
+      const retrieved = getToken();
       
       expect(retrieved).toBeNull();
     });
 
+    it('should return null and clear invalid token (empty string)', () => {
+      localStorage.setItem('jwt_token', '');
+      
+      const retrieved = getToken();
+      
+      expect(retrieved).toBeNull();
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid token detected')
+      );
+    });
+
+    it('should return null and clear invalid token (whitespace only)', () => {
+      localStorage.setItem('jwt_token', '   ');
+      
+      const retrieved = getToken();
+      
+      expect(retrieved).toBeNull();
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+    });
+
     it('should not log the token value to console', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
-      localStorage.setItem('tax_app_jwt_token', token);
+      localStorage.setItem('jwt_token', token);
       
-      tokenManager.getToken();
+      getToken();
       
       // Check that token was not logged
       expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
       expect(consoleErrorSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
       expect(consoleWarnSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
+    });
+
+    it('should work with TokenManager class instance', () => {
+      const token = 'test-token';
+      localStorage.setItem('jwt_token', token);
+      
+      const retrieved = tokenManager.getToken();
+      
+      expect(retrieved).toBe(token);
     });
   });
 
   describe('clearToken', () => {
     it('should remove the token from localStorage', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
-      localStorage.setItem('tax_app_jwt_token', token);
+      localStorage.setItem('jwt_token', token);
       
-      tokenManager.clearToken();
+      clearToken();
       
-      expect(localStorage.getItem('tax_app_jwt_token')).toBeNull();
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+    });
+
+    it('should be idempotent (safe to call multiple times)', () => {
+      const token = 'test-token';
+      localStorage.setItem('jwt_token', token);
+      
+      clearToken();
+      clearToken();
+      clearToken();
+      
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
     it('should not throw error when no token exists', () => {
-      expect(() => tokenManager.clearToken()).not.toThrow();
+      expect(() => clearToken()).not.toThrow();
     });
 
     it('should not log the token value to console', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
-      localStorage.setItem('tax_app_jwt_token', token);
+      localStorage.setItem('jwt_token', token);
       
-      tokenManager.clearToken();
+      clearToken();
       
       // Check that token was not logged
       expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
       expect(consoleErrorSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
       expect(consoleWarnSpy).not.toHaveBeenCalledWith(expect.stringContaining(token));
     });
+
+    it('should work with TokenManager class instance', () => {
+      const token = 'test-token';
+      localStorage.setItem('jwt_token', token);
+      
+      tokenManager.clearToken();
+      
+      expect(localStorage.getItem('jwt_token')).toBeNull();
+    });
   });
 
   describe('hasToken', () => {
-    it('should return true when a token exists', () => {
+    it('should return true when a valid token exists', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
-      localStorage.setItem('tax_app_jwt_token', token);
+      localStorage.setItem('jwt_token', token);
       
-      expect(tokenManager.hasToken()).toBe(true);
+      expect(hasToken()).toBe(true);
     });
 
     it('should return false when no token exists', () => {
-      expect(tokenManager.hasToken()).toBe(false);
+      expect(hasToken()).toBe(false);
+    });
+
+    it('should return false when token is invalid (empty string)', () => {
+      localStorage.setItem('jwt_token', '');
+      
+      expect(hasToken()).toBe(false);
+    });
+
+    it('should return false when token is invalid (whitespace only)', () => {
+      localStorage.setItem('jwt_token', '   ');
+      
+      expect(hasToken()).toBe(false);
     });
 
     it('should return false after token is cleared', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token';
-      tokenManager.setToken(token);
-      tokenManager.clearToken();
+      setToken(token);
+      clearToken();
       
-      expect(tokenManager.hasToken()).toBe(false);
+      expect(hasToken()).toBe(false);
+    });
+
+    it('should work with TokenManager class instance', () => {
+      const token = 'test-token';
+      localStorage.setItem('jwt_token', token);
+      
+      expect(tokenManager.hasToken()).toBe(true);
     });
   });
 
@@ -141,8 +270,8 @@ describe('TokenManager', () => {
     it('should retrieve the exact same token that was stored', () => {
       const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
       
-      tokenManager.setToken(token);
-      const retrieved = tokenManager.getToken();
+      setToken(token);
+      const retrieved = getToken();
       
       expect(retrieved).toBe(token);
     });
@@ -150,19 +279,73 @@ describe('TokenManager', () => {
     it('should handle tokens with special characters', () => {
       const token = 'token.with-special_chars/+=';
       
-      tokenManager.setToken(token);
-      const retrieved = tokenManager.getToken();
+      setToken(token);
+      const retrieved = getToken();
       
       expect(retrieved).toBe(token);
     });
 
-    it('should handle empty string tokens', () => {
-      const token = '';
+    it('should trim whitespace during storage but preserve internal spaces', () => {
+      const token = '  token with spaces  ';
       
-      tokenManager.setToken(token);
-      const retrieved = tokenManager.getToken();
+      setToken(token);
+      const retrieved = getToken();
       
-      expect(retrieved).toBe(token);
+      expect(retrieved).toBe('token with spaces');
+    });
+  });
+
+  describe('localStorage error handling', () => {
+    it('should handle localStorage quota exceeded error in setToken', () => {
+      const token = 'test-token';
+      
+      // Mock localStorage.setItem to throw quota exceeded error
+      jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+      
+      expect(() => setToken(token)).toThrow('Unable to save session');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to store token'),
+        expect.any(Error)
+      );
+      
+      // Restore mock
+      jest.restoreAllMocks();
+    });
+
+    it('should handle localStorage unavailable error in getToken', () => {
+      // Mock localStorage.getItem to throw error
+      jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('localStorage unavailable');
+      });
+      
+      const retrieved = getToken();
+      
+      expect(retrieved).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to retrieve token'),
+        expect.any(Error)
+      );
+      
+      // Restore mock
+      jest.restoreAllMocks();
+    });
+
+    it('should handle localStorage error in clearToken gracefully', () => {
+      // Mock localStorage.removeItem to throw error
+      jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+        throw new Error('localStorage unavailable');
+      });
+      
+      expect(() => clearToken()).not.toThrow();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to clear token'),
+        expect.any(Error)
+      );
+      
+      // Restore mock
+      jest.restoreAllMocks();
     });
   });
 
@@ -171,10 +354,10 @@ describe('TokenManager', () => {
       const token = 'secret-token-value';
       
       // Perform all operations
-      tokenManager.setToken(token);
-      tokenManager.getToken();
-      tokenManager.hasToken();
-      tokenManager.clearToken();
+      setToken(token);
+      getToken();
+      hasToken();
+      clearToken();
       
       // Verify token was never logged
       const allCalls = [
@@ -187,6 +370,20 @@ describe('TokenManager', () => {
         call.forEach(arg => {
           if (typeof arg === 'string') {
             expect(arg).not.toContain(token);
+          }
+        });
+      });
+    });
+
+    it('should log warnings without token values for invalid tokens', () => {
+      setToken('');
+      
+      expect(consoleWarnSpy).toHaveBeenCalled();
+      const warnCalls = consoleWarnSpy.mock.calls;
+      warnCalls.forEach(call => {
+        call.forEach(arg => {
+          if (typeof arg === 'string') {
+            expect(arg).toContain('token value not logged for security');
           }
         });
       });

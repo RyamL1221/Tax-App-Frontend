@@ -24,6 +24,19 @@ export interface LoginResponse {
   userId: string;
 }
 
+export interface LoginStatus {
+  state: 'idle' | 'authenticating' | 'success' | 'error';
+  message: string;
+}
+
+export interface LoginResult {
+  success: boolean;
+  token?: string;
+  email?: string;
+  userId?: string;
+  error?: string;
+}
+
 export interface ForgotPasswordRequest {
   email: string;
 }
