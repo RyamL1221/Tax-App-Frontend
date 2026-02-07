@@ -103,7 +103,8 @@ export function TaxFormSelector({ onFormSelect, className }: TaxFormSelectorProp
             'focus-visible:ring-blue-500',
             'min-h-[44px] text-base',
             'md:min-h-[40px] md:text-sm',
-            'bg-white'
+            'bg-white',
+            'text-gray-900'
           )}
         >
           <option value="">Select a tax form...</option>
