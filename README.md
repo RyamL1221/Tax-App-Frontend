@@ -27,7 +27,23 @@ A Next.js-based tax preparation application with user authentication and tax for
 npm install
 ```
 
-3. Run the development server:
+3. Configure environment variables:
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```bash
+# Backend API Configuration
+# This is the base URL for the backend API that handles authentication and data
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+
+For production, update the URL to your production backend:
+
+```bash
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+```
+
+4. Run the development server:
 
 ```bash
 npm run dev
@@ -39,7 +55,7 @@ pnpm dev
 bun dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Testing the Application
 

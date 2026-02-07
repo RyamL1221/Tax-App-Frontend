@@ -5,30 +5,35 @@
  * - Initial state
  * - Loading state management
  * - Successful logout with redirect
- * - Network error handling
- * - Server error handling
+ * - Error handling (rare cases)
  * - Error auto-clear after 3 seconds
- * - API request format
+ * - Token clearing via authService
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import { useLogout } from './useLogout';
+import { authService } from '@/lib/api';
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
+// Mock authService
+jest.mock('@/lib/api', () => ({
+  authService: {
+    logout: jest.fn(),
+  },
+}));
+
 describe('useLogout', () => {
-  // Mock fetch globally
-  const mockFetch = jest.fn();
   const mockPush = jest.fn();
+  const mockLogout = authService.logout as jest.Mock;
   
   beforeEach(() => {
-    global.fetch = mockFetch;
-    mockFetch.mockClear();
     mockPush.mockClear();
+    mockLogout.mockClear();
     jest.clearAllMocks();
     
     // Setup router mock
@@ -62,62 +67,32 @@ describe('useLogout', () => {
   
   describe('Loading State Management', () => {
     it('should set loading state to true when logout is initiated', async () => {
-      // Create a promise that we can control
-      let resolvePromise: (value: any) => void;
-      const promise = new Promise((resolve) => {
-        resolvePromise = resolve;
-      });
-      
-      mockFetch.mockReturnValue(promise);
-      
       const { result } = renderHook(() => useLogout());
       
       expect(result.current.isLoading).toBe(false);
       
       // Start logout
-      act(() => {
-        result.current.handleLogout();
-      });
-      
-      // Should be loading
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(true);
-      });
-      
-      // Resolve the promise
       await act(async () => {
-        resolvePromise!({
-          json: async () => ({ success: true }),
-        });
+        await result.current.handleLogout();
       });
+      
+      // Should be loading (stays true until redirect completes)
+      expect(result.current.isLoading).toBe(true);
     });
   });
   
   describe('Successful Logout', () => {
-    it('should send POST request to /api/auth/logout', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
-      });
-      
+    it('should call authService.logout()', async () => {
       const { result } = renderHook(() => useLogout());
       
       await act(async () => {
         await result.current.handleLogout();
       });
       
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      expect(mockLogout).toHaveBeenCalledTimes(1);
     });
     
     it('should redirect to /login on successful logout', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
-      });
-      
       const { result } = renderHook(() => useLogout());
       
       await act(async () => {
@@ -128,10 +103,6 @@ describe('useLogout', () => {
     });
     
     it('should keep loading state true until redirect on success', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
-      });
-      
       const { result } = renderHook(() => useLogout());
       
       await act(async () => {
@@ -144,10 +115,6 @@ describe('useLogout', () => {
     });
     
     it('should not set error on successful logout', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
-      });
-      
       const { result } = renderHook(() => useLogout());
       
       await act(async () => {
@@ -158,36 +125,11 @@ describe('useLogout', () => {
     });
   });
   
-  describe('Server Error Handling', () => {
-    it('should display error message when server returns error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
-          success: false,
-          error: {
-            type: 'server',
-            message: 'Failed to clear session',
-          },
-        }),
-      });
-      
-      const { result } = renderHook(() => useLogout());
-      
-      await act(async () => {
-        await result.current.handleLogout();
-      });
-      
-      expect(result.current.error).toBe('Failed to clear session');
-      expect(result.current.isLoading).toBe(false);
-    });
-    
-    it('should use default error message if server error has no message', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
-          success: false,
-          error: {
-            type: 'server',
-          },
-        }),
+  describe('Error Handling', () => {
+    it('should display error message when logout throws an error', async () => {
+      // Mock authService.logout to throw an error (rare case)
+      mockLogout.mockImplementationOnce(() => {
+        throw new Error('Unexpected error');
       });
       
       const { result } = renderHook(() => useLogout());
@@ -197,33 +139,12 @@ describe('useLogout', () => {
       });
       
       expect(result.current.error).toBe('Failed to log out. Please try again.');
+      expect(result.current.isLoading).toBe(false);
     });
     
-    it('should use default error message if response has no error object', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
-          success: false,
-        }),
-      });
-      
-      const { result } = renderHook(() => useLogout());
-      
-      await act(async () => {
-        await result.current.handleLogout();
-      });
-      
-      expect(result.current.error).toBe('Failed to log out. Please try again.');
-    });
-    
-    it('should set loading to false after server error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
-          success: false,
-          error: {
-            type: 'server',
-            message: 'Server error',
-          },
-        }),
+    it('should set loading to false after error', async () => {
+      mockLogout.mockImplementationOnce(() => {
+        throw new Error('Unexpected error');
       });
       
       const { result } = renderHook(() => useLogout());
@@ -233,49 +154,6 @@ describe('useLogout', () => {
       });
       
       expect(result.current.isLoading).toBe(false);
-    });
-  });
-  
-  describe('Network Error Handling', () => {
-    it('should display network error message when fetch fails', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
-      
-      const { result } = renderHook(() => useLogout());
-      
-      await act(async () => {
-        await result.current.handleLogout();
-      });
-      
-      expect(result.current.error).toBe(
-        'Failed to log out. Please check your connection and try again.'
-      );
-      expect(result.current.isLoading).toBe(false);
-    });
-    
-    it('should set loading to false after network error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Failed to fetch'));
-      
-      const { result } = renderHook(() => useLogout());
-      
-      await act(async () => {
-        await result.current.handleLogout();
-      });
-      
-      expect(result.current.isLoading).toBe(false);
-    });
-    
-    it('should handle connection timeout errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Connection timeout'));
-      
-      const { result } = renderHook(() => useLogout());
-      
-      await act(async () => {
-        await result.current.handleLogout();
-      });
-      
-      expect(result.current.error).toBe(
-        'Failed to log out. Please check your connection and try again.'
-      );
     });
   });
   
@@ -288,15 +166,9 @@ describe('useLogout', () => {
       jest.useRealTimers();
     });
     
-    it('should clear error after 3 seconds for server errors', async () => {
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({
-          success: false,
-          error: {
-            type: 'server',
-            message: 'Server error',
-          },
-        }),
+    it('should clear error after 3 seconds', async () => {
+      mockLogout.mockImplementationOnce(() => {
+        throw new Error('Unexpected error');
       });
       
       const { result } = renderHook(() => useLogout());
@@ -305,28 +177,7 @@ describe('useLogout', () => {
         await result.current.handleLogout();
       });
       
-      expect(result.current.error).toBe('Server error');
-      
-      // Fast-forward time by 3 seconds
-      act(() => {
-        jest.advanceTimersByTime(3000);
-      });
-      
-      expect(result.current.error).toBeNull();
-    });
-    
-    it('should clear error after 3 seconds for network errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
-      
-      const { result } = renderHook(() => useLogout());
-      
-      await act(async () => {
-        await result.current.handleLogout();
-      });
-      
-      expect(result.current.error).toBe(
-        'Failed to log out. Please check your connection and try again.'
-      );
+      expect(result.current.error).toBe('Failed to log out. Please try again.');
       
       // Fast-forward time by 3 seconds
       act(() => {
@@ -337,7 +188,9 @@ describe('useLogout', () => {
     });
     
     it('should not clear error before 3 seconds', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockLogout.mockImplementationOnce(() => {
+        throw new Error('Unexpected error');
+      });
       
       const { result } = renderHook(() => useLogout());
       
@@ -345,9 +198,7 @@ describe('useLogout', () => {
         await result.current.handleLogout();
       });
       
-      expect(result.current.error).toBe(
-        'Failed to log out. Please check your connection and try again.'
-      );
+      expect(result.current.error).toBe('Failed to log out. Please try again.');
       
       // Fast-forward time by 2 seconds (less than 3)
       act(() => {
@@ -355,16 +206,16 @@ describe('useLogout', () => {
       });
       
       // Error should still be present
-      expect(result.current.error).toBe(
-        'Failed to log out. Please check your connection and try again.'
-      );
+      expect(result.current.error).toBe('Failed to log out. Please try again.');
     });
   });
   
   describe('Error State Clearing', () => {
     it('should clear previous error when new logout is initiated', async () => {
       // First logout - fails
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockLogout.mockImplementationOnce(() => {
+        throw new Error('Unexpected error');
+      });
       
       const { result } = renderHook(() => useLogout());
       
@@ -372,13 +223,11 @@ describe('useLogout', () => {
         await result.current.handleLogout();
       });
       
-      expect(result.current.error).toBe(
-        'Failed to log out. Please check your connection and try again.'
-      );
+      expect(result.current.error).toBe('Failed to log out. Please try again.');
       
       // Second logout - succeeds
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
+      mockLogout.mockImplementationOnce(() => {
+        // Success - no error
       });
       
       await act(async () => {
@@ -392,31 +241,23 @@ describe('useLogout', () => {
   
   describe('Multiple Logout Attempts', () => {
     it('should handle multiple logout attempts correctly', async () => {
-      // First attempt - success
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
-      });
-      
       const { result } = renderHook(() => useLogout());
       
+      // First attempt - success
       await act(async () => {
         await result.current.handleLogout();
       });
       
       expect(mockPush).toHaveBeenCalledWith('/login');
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockLogout).toHaveBeenCalledTimes(1);
       
       // Second attempt - should also work
-      mockFetch.mockResolvedValueOnce({
-        json: async () => ({ success: true }),
-      });
-      
       await act(async () => {
         await result.current.handleLogout();
       });
       
       expect(mockPush).toHaveBeenCalledTimes(2);
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockLogout).toHaveBeenCalledTimes(2);
     });
   });
 });

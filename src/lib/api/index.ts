@@ -34,6 +34,7 @@ import { TokenManager } from './tokenManager';
 import { AuthService } from './authService';
 import { DocumentService } from './documentService';
 import { authRequestInterceptor, authResponseInterceptor } from './interceptors';
+import type { ApiError } from './types';
 
 // ============================================================================
 // Singleton Instances
@@ -135,3 +136,43 @@ export type { ValidationResult } from './validators';
 // ============================================================================
 
 export { ErrorHandler } from './errorHandler';
+
+// ============================================================================
+// Type Guard Utilities
+// ============================================================================
+
+/**
+ * Type guard to check if an error is an ApiError
+ * 
+ * This utility function helps distinguish API errors (with status codes and
+ * structured error messages) from generic JavaScript errors. Use this in
+ * catch blocks to handle API errors differently from network errors.
+ * 
+ * @param error - The error to check
+ * @returns true if the error is an ApiError, false otherwise
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   await authService.login({ email, password });
+ * } catch (error) {
+ *   if (isApiError(error)) {
+ *     // Handle API error with status code
+ *     console.error(`API Error ${error.status}: ${error.message}`);
+ *   } else {
+ *     // Handle network or other errors
+ *     console.error('Network error:', error);
+ *   }
+ * }
+ * ```
+ */
+export function isApiError(error: unknown): error is ApiError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    'message' in error &&
+    typeof (error as ApiError).status === 'number' &&
+    typeof (error as ApiError).message === 'string'
+  );
+}

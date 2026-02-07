@@ -106,7 +106,7 @@ export function LoginForm({ className, onSuccess, onError }: LoginFormProps) {
           aria-required="true"
           disabled={isSubmitting || isRateLimited}
           className={cn(
-            'w-full px-3 py-2 rounded-md border text-base',
+            'w-full px-3 py-2 rounded-md border text-base text-gray-900',
             'transition-colors duration-200',
             'placeholder:text-gray-400',
             'focus:outline-none focus:ring-2 focus:ring-offset-2',
@@ -162,7 +162,7 @@ export function LoginForm({ className, onSuccess, onError }: LoginFormProps) {
             aria-required="true"
             disabled={isSubmitting || isRateLimited}
             className={cn(
-              'w-full px-3 py-2 pr-12 rounded-md border text-base',
+              'w-full px-3 py-2 pr-12 rounded-md border text-base text-gray-900',
               'transition-colors duration-200',
               'placeholder:text-gray-400',
               'focus:outline-none focus:ring-2 focus:ring-offset-2',

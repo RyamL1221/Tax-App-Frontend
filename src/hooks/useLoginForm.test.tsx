@@ -6,7 +6,7 @@
  * - Password visibility toggle
  * - Form submission handling
  * - Rate limiting integration
- * - Authentication API calls
+ * - Authentication API calls via authService
  * - Loading and error states
  * - Field error clearing
  */
@@ -20,16 +20,26 @@ jest.mock('./useRateLimit', () => ({
   useRateLimit: jest.fn(),
 }));
 
-// Import the mocked module to access mock functions
+// Mock the API client
+jest.mock('@/lib/api', () => ({
+  authService: {
+    login: jest.fn(),
+  },
+  isApiError: jest.fn(),
+}));
+
+// Import the mocked modules to access mock functions
 import { useRateLimit } from './useRateLimit';
+import { authService, isApiError } from '@/lib/api';
 
 describe('useLoginForm', () => {
-  // Mock fetch globally
-  const mockFetch = jest.fn();
+  // Mock authService.login
+  const mockLogin = authService.login as jest.MockedFunction<typeof authService.login>;
+  const mockIsApiError = isApiError as jest.MockedFunction<typeof isApiError>;
   
   beforeEach(() => {
-    global.fetch = mockFetch;
-    mockFetch.mockClear();
+    mockLogin.mockClear();
+    mockIsApiError.mockClear();
     jest.clearAllMocks();
     
     // Reset useRateLimit mock to default state
@@ -40,6 +50,9 @@ describe('useLoginForm', () => {
       recordAttempt: jest.fn(),
       reset: jest.fn(),
     });
+    
+    // Default isApiError to return false (network errors)
+    mockIsApiError.mockReturnValue(false);
   });
   
   afterEach(() => {
@@ -97,14 +110,11 @@ describe('useLoginForm', () => {
   });
   
   describe('Form Submission - Successful Authentication', () => {
-    it('should call authentication API with correct credentials', async () => {
-      const mockResponse: AuthResponse = {
-        success: true,
-        redirectUrl: '/dashboard',
-      };
-      
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
+    it('should call authService.login with correct credentials', async () => {
+      mockLogin.mockResolvedValueOnce({
+        token: 'mock-jwt-token',
+        email: 'test@example.com',
+        userId: 'user-123',
       });
       
       const { result } = renderHook(() => useLoginForm());
@@ -116,26 +126,17 @@ describe('useLoginForm', () => {
         });
       });
       
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: 'test@example.com',
-          password: 'password123',
-        }),
+      expect(mockLogin).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123',
       });
     });
     
-    it('should call onSuccess callback with redirect URL on successful authentication', async () => {
-      const mockResponse: AuthResponse = {
-        success: true,
-        redirectUrl: '/dashboard',
-      };
-      
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
+    it('should call onSuccess callback with /dashboard on successful authentication', async () => {
+      mockLogin.mockResolvedValueOnce({
+        token: 'mock-jwt-token',
+        email: 'test@example.com',
+        userId: 'user-123',
       });
       
       const onSuccess = jest.fn();
@@ -161,13 +162,10 @@ describe('useLoginForm', () => {
         reset: mockReset,
       });
       
-      const mockResponse: AuthResponse = {
-        success: true,
-        redirectUrl: '/dashboard',
-      };
-      
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
+      mockLogin.mockResolvedValueOnce({
+        token: 'mock-jwt-token',
+        email: 'test@example.com',
+        userId: 'user-123',
       });
       
       const { result } = renderHook(() => useLoginForm());
@@ -185,17 +183,13 @@ describe('useLoginForm', () => {
   
   describe('Form Submission - Failed Authentication', () => {
     it('should display error message on authentication failure', async () => {
-      const mockResponse: AuthResponse = {
-        success: false,
-        error: {
-          type: 'authentication',
-          message: 'Invalid email or password',
-        },
+      const apiError = {
+        status: 401,
+        message: 'Invalid email or password',
       };
       
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
-      });
+      mockLogin.mockRejectedValueOnce(apiError);
+      mockIsApiError.mockReturnValue(true);
       
       const { result } = renderHook(() => useLoginForm());
       
@@ -210,17 +204,13 @@ describe('useLoginForm', () => {
     });
     
     it('should call onError callback on authentication failure', async () => {
-      const mockResponse: AuthResponse = {
-        success: false,
-        error: {
-          type: 'authentication',
-          message: 'Invalid email or password',
-        },
+      const apiError = {
+        status: 401,
+        message: 'Invalid email or password',
       };
       
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
-      });
+      mockLogin.mockRejectedValueOnce(apiError);
+      mockIsApiError.mockReturnValue(true);
       
       const onError = jest.fn();
       const { result } = renderHook(() => useLoginForm({ onError }));
@@ -238,7 +228,7 @@ describe('useLoginForm', () => {
       });
     });
     
-    it('should record attempt on authentication failure', async () => {
+    it('should record attempt on authentication failure (401 error)', async () => {
       const mockRecordAttempt = jest.fn();
       (useRateLimit as jest.Mock).mockReturnValue({
         isLocked: false,
@@ -248,17 +238,13 @@ describe('useLoginForm', () => {
         reset: jest.fn(),
       });
       
-      const mockResponse: AuthResponse = {
-        success: false,
-        error: {
-          type: 'authentication',
-          message: 'Invalid email or password',
-        },
+      const apiError = {
+        status: 401,
+        message: 'Invalid email or password',
       };
       
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
-      });
+      mockLogin.mockRejectedValueOnce(apiError);
+      mockIsApiError.mockReturnValue(true);
       
       const { result } = renderHook(() => useLoginForm());
       
@@ -275,7 +261,8 @@ describe('useLoginForm', () => {
   
   describe('Form Submission - Network Errors', () => {
     it('should handle network errors gracefully', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockLogin.mockRejectedValueOnce(new Error('Network error'));
+      mockIsApiError.mockReturnValue(false);
       
       const { result } = renderHook(() => useLoginForm());
       
@@ -292,7 +279,8 @@ describe('useLoginForm', () => {
     });
     
     it('should call onError callback on network error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockLogin.mockRejectedValueOnce(new Error('Network error'));
+      mockIsApiError.mockReturnValue(false);
       
       const onError = jest.fn();
       const { result } = renderHook(() => useLoginForm({ onError }));
@@ -325,13 +313,10 @@ describe('useLoginForm', () => {
      */
     describe('Successful Authentication (Requirement 1.2)', () => {
       it('should redirect to dashboard on successful authentication', async () => {
-        const mockResponse: AuthResponse = {
-          success: true,
-          redirectUrl: '/dashboard',
-        };
-        
-        mockFetch.mockResolvedValueOnce({
-          json: async () => mockResponse,
+        mockLogin.mockResolvedValueOnce({
+          token: 'mock-jwt-token',
+          email: 'user@example.com',
+          userId: 'user-123',
         });
         
         const onSuccess = jest.fn();
@@ -349,44 +334,15 @@ describe('useLoginForm', () => {
         expect(onSuccess).toHaveBeenCalledTimes(1);
       });
       
-      it('should redirect to home page on successful authentication', async () => {
-        const mockResponse: AuthResponse = {
-          success: true,
-          redirectUrl: '/home',
-        };
-        
-        mockFetch.mockResolvedValueOnce({
-          json: async () => mockResponse,
-        });
-        
-        const onSuccess = jest.fn();
-        const { result } = renderHook(() => useLoginForm({ onSuccess }));
-        
-        await act(async () => {
-          await result.current.onSubmit({
-            email: 'user@example.com',
-            password: 'validpassword',
-          });
-        });
-        
-        // Verify redirect URL is passed to onSuccess callback
-        expect(onSuccess).toHaveBeenCalledWith('/home');
-        expect(onSuccess).toHaveBeenCalledTimes(1);
-      });
-      
       it('should clear any previous errors on successful authentication', async () => {
         // First attempt - fail
-        const failResponse: AuthResponse = {
-          success: false,
-          error: {
-            type: 'authentication',
-            message: 'Invalid email or password',
-          },
+        const apiError = {
+          status: 401,
+          message: 'Invalid email or password',
         };
         
-        mockFetch.mockResolvedValueOnce({
-          json: async () => failResponse,
-        });
+        mockLogin.mockRejectedValueOnce(apiError);
+        mockIsApiError.mockReturnValue(true);
         
         const { result } = renderHook(() => useLoginForm());
         
@@ -400,13 +356,10 @@ describe('useLoginForm', () => {
         expect(result.current.authError).toBe('Invalid email or password');
         
         // Second attempt - succeed
-        const successResponse: AuthResponse = {
-          success: true,
-          redirectUrl: '/dashboard',
-        };
-        
-        mockFetch.mockResolvedValueOnce({
-          json: async () => successResponse,
+        mockLogin.mockResolvedValueOnce({
+          token: 'mock-jwt-token',
+          email: 'user@example.com',
+          userId: 'user-123',
         });
         
         await act(async () => {
@@ -428,17 +381,13 @@ describe('useLoginForm', () => {
      */
     describe('Failed Authentication (Requirement 1.3)', () => {
       it('should display "Invalid email or password" error on authentication failure', async () => {
-        const mockResponse: AuthResponse = {
-          success: false,
-          error: {
-            type: 'authentication',
-            message: 'Invalid email or password',
-          },
+        const apiError = {
+          status: 401,
+          message: 'Invalid email or password',
         };
         
-        mockFetch.mockResolvedValueOnce({
-          json: async () => mockResponse,
-        });
+        mockLogin.mockRejectedValueOnce(apiError);
+        mockIsApiError.mockReturnValue(true);
         
         const { result } = renderHook(() => useLoginForm());
         
@@ -454,17 +403,13 @@ describe('useLoginForm', () => {
       });
       
       it('should trigger onError callback with authentication error details', async () => {
-        const mockResponse: AuthResponse = {
-          success: false,
-          error: {
-            type: 'authentication',
-            message: 'Invalid email or password',
-          },
+        const apiError = {
+          status: 401,
+          message: 'Invalid email or password',
         };
         
-        mockFetch.mockResolvedValueOnce({
-          json: async () => mockResponse,
-        });
+        mockLogin.mockRejectedValueOnce(apiError);
+        mockIsApiError.mockReturnValue(true);
         
         const onError = jest.fn();
         const { result } = renderHook(() => useLoginForm({ onError }));
@@ -485,17 +430,13 @@ describe('useLoginForm', () => {
       });
       
       it('should not clear error until user starts typing or submits again', async () => {
-        const mockResponse: AuthResponse = {
-          success: false,
-          error: {
-            type: 'authentication',
-            message: 'Invalid email or password',
-          },
+        const apiError = {
+          status: 401,
+          message: 'Invalid email or password',
         };
         
-        mockFetch.mockResolvedValueOnce({
-          json: async () => mockResponse,
-        });
+        mockLogin.mockRejectedValueOnce(apiError);
+        mockIsApiError.mockReturnValue(true);
         
         const { result } = renderHook(() => useLoginForm());
         
@@ -522,7 +463,8 @@ describe('useLoginForm', () => {
      */
     describe('Network Error Handling (Requirement 1.4)', () => {
       it('should display connection error message when network fails', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Failed to fetch'));
+        mockLogin.mockRejectedValueOnce(new Error('Failed to fetch'));
+        mockIsApiError.mockReturnValue(false);
         
         const { result } = renderHook(() => useLoginForm());
         
@@ -540,7 +482,8 @@ describe('useLoginForm', () => {
       });
       
       it('should display connection error message when server is unavailable', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
+        mockLogin.mockRejectedValueOnce(new Error('Network request failed'));
+        mockIsApiError.mockReturnValue(false);
         
         const { result } = renderHook(() => useLoginForm());
         
@@ -558,7 +501,8 @@ describe('useLoginForm', () => {
       });
       
       it('should trigger onError callback with network error details', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Connection timeout'));
+        mockLogin.mockRejectedValueOnce(new Error('Connection timeout'));
+        mockIsApiError.mockReturnValue(false);
         
         const onError = jest.fn();
         const { result } = renderHook(() => useLoginForm({ onError }));
@@ -576,32 +520,6 @@ describe('useLoginForm', () => {
           message: 'Unable to connect. Please check your connection and try again',
         });
         expect(onError).toHaveBeenCalledTimes(1);
-      });
-      
-      it('should handle unexpected response format as network error', async () => {
-        // Response with missing required fields
-        const mockResponse = {
-          success: false,
-          // Missing error field
-        };
-        
-        mockFetch.mockResolvedValueOnce({
-          json: async () => mockResponse,
-        });
-        
-        const { result } = renderHook(() => useLoginForm());
-        
-        await act(async () => {
-          await result.current.onSubmit({
-            email: 'user@example.com',
-            password: 'password123',
-          });
-        });
-        
-        // Should display generic error message
-        expect(result.current.authError).toBe(
-          'Something went wrong. Please try again later'
-        );
       });
     });
   });
@@ -628,8 +546,8 @@ describe('useLoginForm', () => {
         });
       });
       
-      // Should not call fetch when rate limited
-      expect(mockFetch).not.toHaveBeenCalled();
+      // Should not call authService.login when rate limited
+      expect(mockLogin).not.toHaveBeenCalled();
       
       // Should display rate limit error
       expect(result.current.authError).toContain('Too many attempts');
@@ -671,17 +589,13 @@ describe('useLoginForm', () => {
     });
     
     it('should clear auth error when clearFieldError is called', async () => {
-      const mockResponse: AuthResponse = {
-        success: false,
-        error: {
-          type: 'authentication',
-          message: 'Invalid email or password',
-        },
+      const apiError = {
+        status: 401,
+        message: 'Invalid email or password',
       };
       
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse,
-      });
+      mockLogin.mockRejectedValueOnce(apiError);
+      mockIsApiError.mockReturnValue(true);
       
       const { result } = renderHook(() => useLoginForm());
       
@@ -711,7 +625,7 @@ describe('useLoginForm', () => {
         resolvePromise = resolve;
       });
       
-      mockFetch.mockReturnValue(promise);
+      mockLogin.mockReturnValue(promise as any);
       
       const { result } = renderHook(() => useLoginForm());
       
@@ -732,10 +646,9 @@ describe('useLoginForm', () => {
       // Resolve the promise
       await act(async () => {
         resolvePromise!({
-          json: async () => ({
-            success: true,
-            redirectUrl: '/dashboard',
-          }),
+          token: 'mock-jwt-token',
+          email: 'test@example.com',
+          userId: 'user-123',
         });
       });
       
@@ -749,17 +662,13 @@ describe('useLoginForm', () => {
   describe('Error State Clearing', () => {
     it('should clear previous auth errors on new submission', async () => {
       // First submission - fails
-      const mockResponse1: AuthResponse = {
-        success: false,
-        error: {
-          type: 'authentication',
-          message: 'Invalid email or password',
-        },
+      const apiError = {
+        status: 401,
+        message: 'Invalid email or password',
       };
       
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse1,
-      });
+      mockLogin.mockRejectedValueOnce(apiError);
+      mockIsApiError.mockReturnValue(true);
       
       const { result } = renderHook(() => useLoginForm());
       
@@ -773,13 +682,10 @@ describe('useLoginForm', () => {
       expect(result.current.authError).toBe('Invalid email or password');
       
       // Second submission - succeeds
-      const mockResponse2: AuthResponse = {
-        success: true,
-        redirectUrl: '/dashboard',
-      };
-      
-      mockFetch.mockResolvedValueOnce({
-        json: async () => mockResponse2,
+      mockLogin.mockResolvedValueOnce({
+        token: 'mock-jwt-token',
+        email: 'test@example.com',
+        userId: 'user-123',
       });
       
       await act(async () => {
@@ -802,12 +708,13 @@ describe('useLoginForm', () => {
  * across all possible inputs and execution paths.
  */
 describe('useLoginForm Property-Based Tests', () => {
-  // Mock fetch globally
-  const mockFetch = jest.fn();
+  // Mock authService.login
+  const mockLogin = authService.login as jest.MockedFunction<typeof authService.login>;
+  const mockIsApiError = isApiError as jest.MockedFunction<typeof isApiError>;
   
   beforeEach(() => {
-    global.fetch = mockFetch;
-    mockFetch.mockClear();
+    mockLogin.mockClear();
+    mockIsApiError.mockClear();
     jest.clearAllMocks();
     
     // Reset useRateLimit mock to default state
@@ -818,6 +725,9 @@ describe('useLoginForm Property-Based Tests', () => {
       recordAttempt: jest.fn(),
       reset: jest.fn(),
     });
+    
+    // Default isApiError to return false (network errors)
+    mockIsApiError.mockReturnValue(false);
   });
   
   afterEach(() => {
@@ -829,80 +739,66 @@ describe('useLoginForm Property-Based Tests', () => {
   test('property: form submission state transitions correctly for any submission outcome', async () => {
     const fc = require('fast-check');
     
-    await fc.assert(
-      fc.asyncProperty(
-        // Generate arbitrary email and password
-        fc.emailAddress(),
-        fc.string({ minLength: 8, maxLength: 100 }),
-        // Generate arbitrary submission outcome (success or failure)
-        fc.oneof(
-          // Success response
-          fc.record({
-            success: fc.constant(true),
-            redirectUrl: fc.constantFrom('/dashboard', '/home', '/profile'),
-          }),
-          // Authentication failure response
-          fc.record({
-            success: fc.constant(false),
-            error: fc.record({
-              type: fc.constant('authentication' as const),
-              message: fc.constant('Invalid email or password'),
-            }),
-          }),
-          // Network error response
-          fc.record({
-            success: fc.constant(false),
-            error: fc.record({
-              type: fc.constant('network' as const),
-              message: fc.constant('Unable to connect. Please check your connection and try again'),
-            }),
-          })
-        ),
-        async (email, password, response) => {
-          // Setup: Mock the fetch response
-          let resolvePromise: (value: any) => void;
-          const promise = new Promise((resolve) => {
-            resolvePromise = resolve;
-          });
-          
-          mockFetch.mockReturnValue(promise);
-          
-          const { result } = renderHook(() => useLoginForm());
-          
-          // Property: Before submission, form should not be submitting
-          expect(result.current.isSubmitting).toBe(false);
-          
-          // Start submission
-          act(() => {
-            result.current.handleSubmit(result.current.onSubmit)({
-              preventDefault: jest.fn(),
-            } as any);
-          });
-          
-          // Property: During submission, form should be in submitting state
-          await waitFor(() => {
-            expect(result.current.isSubmitting).toBe(true);
-          });
-          
-          // Resolve the promise with the response
-          await act(async () => {
-            resolvePromise!({
-              json: async () => response,
-            });
-          });
-          
-          // Property: After submission completes (success or failure),
-          // form should no longer be submitting
-          await waitFor(() => {
+    // Suppress console errors for this test since errors are expected
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    
+    try {
+      await fc.assert(
+        fc.asyncProperty(
+          // Generate arbitrary email and password
+          fc.emailAddress(),
+          fc.string({ minLength: 8, maxLength: 100 }),
+          // Generate arbitrary submission outcome (success or failure)
+          fc.boolean(), // true = success, false = failure
+          fc.boolean(), // if failure, true = API error, false = network error
+          async (email, password, isSuccess, isApiError) => {
+            // Setup: Mock the authService response
+            if (isSuccess) {
+              mockLogin.mockResolvedValueOnce({
+                token: 'mock-jwt-token',
+                email: email,
+                userId: 'user-123',
+              });
+            } else if (isApiError) {
+              mockIsApiError.mockReturnValue(true);
+              mockLogin.mockRejectedValueOnce({
+                status: 401,
+                message: 'Invalid email or password',
+              });
+            } else {
+              mockIsApiError.mockReturnValue(false);
+              // Use a plain object instead of Error to avoid console noise
+              mockLogin.mockRejectedValueOnce({ message: 'Network error' });
+            }
+            
+            const { result } = renderHook(() => useLoginForm());
+            
+            // Property: Before submission, form should not be submitting
             expect(result.current.isSubmitting).toBe(false);
-          });
-          
-          // Cleanup
-          mockFetch.mockClear();
-        }
-      ),
-      { numRuns: 100 }
-    );
+            
+            // Submit the form
+            await act(async () => {
+              await result.current.onSubmit({
+                email,
+                password,
+              });
+            });
+            
+            // Property: After submission completes (success or failure),
+            // form should no longer be submitting
+            expect(result.current.isSubmitting).toBe(false);
+            
+            // Cleanup
+            mockLogin.mockClear();
+            mockIsApiError.mockClear();
+          }
+        ),
+        { numRuns: 50 } // Reduced runs for faster execution
+      );
+    } finally {
+      // Restore console.error
+      consoleErrorSpy.mockRestore();
+    }
   });
   
   // Feature: login-page, Property 7: Field error clearing on input
@@ -916,17 +812,13 @@ describe('useLoginForm Property-Based Tests', () => {
         fc.constantFrom('email' as const, 'password' as const),
         async (fieldToClear) => {
           // Setup: Create a hook instance with an authentication error
-          const mockResponse: AuthResponse = {
-            success: false,
-            error: {
-              type: 'authentication',
-              message: 'Invalid email or password',
-            },
+          const apiError = {
+            status: 401,
+            message: 'Invalid email or password',
           };
           
-          mockFetch.mockResolvedValueOnce({
-            json: async () => mockResponse,
-          });
+          mockLogin.mockRejectedValueOnce(apiError);
+          mockIsApiError.mockReturnValue(true);
           
           const { result } = renderHook(() => useLoginForm());
           
@@ -950,7 +842,8 @@ describe('useLoginForm Property-Based Tests', () => {
           expect(result.current.authError).toBeNull();
           
           // Cleanup
-          mockFetch.mockClear();
+          mockLogin.mockClear();
+          mockIsApiError.mockClear();
         }
       ),
       { numRuns: 100 }

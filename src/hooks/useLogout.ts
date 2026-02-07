@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { authService } from '@/lib/api';
 
 /**
  * Return type for the useLogout hook
@@ -28,7 +29,7 @@ export interface UseLogoutReturn {
  * 
  * Handles the complete logout flow including:
  * - Loading state management
- * - API request to /api/auth/logout
+ * - Token clearing via authService
  * - Success handling with redirect to /login
  * - Error handling with user-friendly messages
  * - Auto-clearing errors after 3 seconds
@@ -57,18 +58,16 @@ export function useLogout(): UseLogoutReturn {
   /**
    * Handle logout process
    * 
-   * Sends POST request to /api/auth/logout endpoint.
+   * Clears JWT token from localStorage via authService.
    * On success: redirects to /login page
    * On error: displays error message for 3 seconds then clears it
    * 
    * Requirements:
-   * - 3.1: Sends POST request to logout API
-   * - 3.2: Displays loading state during request
+   * - 3.1: Calls authService.logout() to clear token
+   * - 3.2: Token is removed from localStorage
    * - 3.3: Redirects to /login on success
-   * - 5.1: Displays network error messages
-   * - 5.2: Displays server error messages
-   * - 5.3: Re-enables button after error
-   * - 5.4: Auto-clears error after 3 seconds
+   * - 3.4: Displays loading state during process
+   * - 3.5: Clears token even if error occurs
    */
   const handleLogout = useCallback(async () => {
     // Clear any previous errors and set loading state
@@ -76,37 +75,17 @@ export function useLogout(): UseLogoutReturn {
     setIsLoading(true);
     
     try {
-      // Send POST request to logout API
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Clear JWT token from localStorage (synchronous operation)
+      authService.logout();
       
-      // Parse response
-      const result = await response.json();
-      
-      if (result.success) {
-        // Success - redirect to login page
-        // Keep loading state true until redirect completes
-        router.push('/login');
-      } else {
-        // Server returned error response
-        setIsLoading(false);
-        const errorMessage = result.error?.message || 'Failed to log out. Please try again.';
-        setError(errorMessage);
-        
-        // Auto-clear error after 3 seconds
-        setTimeout(() => {
-          setError(null);
-        }, 3000);
-      }
+      // Success - redirect to login page
+      // Keep loading state true until redirect completes
+      router.push('/login');
     } catch (err) {
-      // Network error or other exception
+      // This should rarely happen since logout is synchronous
+      // But we handle it gracefully just in case
       setIsLoading(false);
-      const errorMessage = 'Failed to log out. Please check your connection and try again.';
-      setError(errorMessage);
+      setError('Failed to log out. Please try again.');
       
       // Auto-clear error after 3 seconds
       setTimeout(() => {

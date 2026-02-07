@@ -119,7 +119,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
             autoComplete="current-password"
             className={cn(
               // Base styles
-              'w-full px-3 py-2 pr-12 rounded-md border text-base',
+              'w-full px-3 py-2 pr-12 rounded-md border text-base text-gray-900',
               'transition-colors duration-200',
               'placeholder:text-gray-400',
               

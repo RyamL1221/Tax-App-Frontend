@@ -4,8 +4,9 @@ import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@/lib/validation';
-import { LoginFormData, AuthResponse, AuthError } from '@/types/auth';
+import { LoginFormData, AuthError } from '@/types/auth';
 import { useRateLimit } from './useRateLimit';
+import { authService, isApiError } from '@/lib/api';
 
 /**
  * Options for configuring the useLoginForm hook
@@ -59,7 +60,7 @@ export interface UseLoginFormReturn {
   /**
    * Form submission handler
    */
-  onSubmit: (data: LoginFormData) => Promise<void>;
+  onSubmit: (data: LoginFormData, event?: React.BaseSyntheticEvent) => Promise<void>;
   
   /**
    * General authentication error (not field-specific)
@@ -174,7 +175,14 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
    * Passwords are only held in memory during form submission and
    * immediately sent to the server via HTTPS.
    */
-  const onSubmit = useCallback(async (data: LoginFormData) => {
+  const onSubmit = useCallback(async (data: LoginFormData, event?: React.BaseSyntheticEvent) => {
+    // Defensive: Explicitly prevent default form behavior (Requirements 1.1, 9.1, 9.2)
+    console.log('Form submission started');
+    if (event) {
+      event.preventDefault();
+      console.log('Default behavior prevented');
+    }
+    
     // Clear any previous auth errors
     setAuthError(null);
     
@@ -192,54 +200,46 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     }
     
     try {
-      // Call authentication API
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
+      // Call authentication API using authService (Requirement 9.3)
+      console.log('Calling API client login method');
+      await authService.login({
+        email: data.email,
+        password: data.password
       });
       
-      // Parse response
-      const result: AuthResponse = await response.json();
-      
-      if (result.success && result.redirectUrl) {
-        // Success - reset rate limit and call success callback
-        resetRateLimit();
-        if (onSuccess) {
-          onSuccess(result.redirectUrl);
-        }
-      } else if (result.error) {
-        // Authentication failed - record attempt and display error
-        if (result.error.type === 'authentication') {
+      // Token is automatically stored by authService
+      // Success - reset rate limit and redirect to dashboard (Requirement 9.4)
+      console.log('API call successful');
+      resetRateLimit();
+      if (onSuccess) {
+        onSuccess('/dashboard');
+      }
+    } catch (error) {
+      // Handle API errors (Requirement 9.5)
+      console.error('API call failed:', error);
+      if (isApiError(error)) {
+        // Record attempt for authentication errors (401)
+        if (error.status === 401) {
           recordAttempt();
         }
         
-        setAuthError(result.error.message);
-        if (onError) {
-          onError(result.error);
-        }
-      } else {
-        // Unexpected response format
-        const error: AuthError = {
-          type: 'network',
-          message: 'Something went wrong. Please try again later',
-        };
         setAuthError(error.message);
         if (onError) {
-          onError(error);
+          onError({
+            type: 'authentication',
+            message: error.message
+          });
         }
-      }
-    } catch (error) {
-      // Network error or other exception
-      const authErrorObj: AuthError = {
-        type: 'network',
-        message: 'Unable to connect. Please check your connection and try again',
-      };
-      setAuthError(authErrorObj.message);
-      if (onError) {
-        onError(authErrorObj);
+      } else {
+        // Network error or other exception
+        const authErrorObj: AuthError = {
+          type: 'network',
+          message: 'Unable to connect. Please check your connection and try again',
+        };
+        setAuthError(authErrorObj.message);
+        if (onError) {
+          onError(authErrorObj);
+        }
       }
     }
   }, [

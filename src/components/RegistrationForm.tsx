@@ -60,6 +60,10 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
     handleBlur,
     handleSubmit,
   } = useRegistrationForm({ onSuccess });
+  
+  console.log('[RegistrationForm] Component rendered');
+  console.log('[RegistrationForm] handleSubmit type:', typeof handleSubmit);
+  console.log('[RegistrationForm] handleSubmit defined:', handleSubmit !== undefined);
 
   // Local state for password visibility toggles
   const [showPassword, setShowPassword] = useState(false);
@@ -68,8 +72,11 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
   return (
     <form
       onSubmit={handleSubmit}
+      action="#"
+      method="post"
       className={cn('space-y-6', className)}
       noValidate
+      data-testid="registration-form"
     >
       {/* General Error Message */}
       {errors.general && (
@@ -118,7 +125,7 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
           aria-required="true"
           autoComplete="name"
           className={cn(
-            'w-full px-3 py-2 rounded-md border text-base',
+            'w-full px-3 py-2 rounded-md border text-base text-gray-900',
             'transition-colors duration-200',
             'placeholder:text-gray-400',
             'focus:outline-none focus:ring-2 focus:ring-offset-2',
