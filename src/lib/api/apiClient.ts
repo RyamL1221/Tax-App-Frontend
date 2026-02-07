@@ -193,8 +193,9 @@ export class ApiClient {
       const fetchOptions: RequestInit = {
         method: config.method,
         headers,
-        mode: 'cors',
-        credentials: 'include'
+        mode: 'cors'
+        // Note: credentials: 'include' is not needed for JWT auth with localStorage
+        // Only use credentials: 'include' if using cookie-based authentication
       };
 
       // Add body for POST, PUT requests

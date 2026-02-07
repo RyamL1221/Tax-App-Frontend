@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRegistrationForm } from '@/hooks/useRegistrationForm';
 import { EmailInput } from '@/components/ui/EmailInput';
@@ -60,14 +60,26 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
     handleBlur,
     handleSubmit,
   } = useRegistrationForm({ onSuccess });
-  
-  console.log('[RegistrationForm] Component rendered');
-  console.log('[RegistrationForm] handleSubmit type:', typeof handleSubmit);
-  console.log('[RegistrationForm] handleSubmit defined:', handleSubmit !== undefined);
 
   // Local state for password visibility toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const handlePasswordToggle = useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setShowPassword(prev => !prev);
+  }, []);
+
+  const handleConfirmPasswordToggle = useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setShowConfirmPassword(prev => !prev);
+  }, []);
 
   return (
     <form
@@ -184,7 +196,7 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
           disabled={isLoading || isRateLimited}
           label="Password"
           showPassword={showPassword}
-          onToggleVisibility={() => setShowPassword(!showPassword)}
+          onToggleVisibility={handlePasswordToggle}
         />
         
         {/* Show strength indicator and requirements when user starts typing */}
@@ -206,7 +218,7 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
         disabled={isLoading || isRateLimited}
         label="Confirm Password"
         showPassword={showConfirmPassword}
-        onToggleVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
+        onToggleVisibility={handleConfirmPasswordToggle}
       />
 
       {/* Rate Limit Message */}

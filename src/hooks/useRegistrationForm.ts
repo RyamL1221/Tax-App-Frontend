@@ -100,8 +100,6 @@ export function useRegistrationForm(
   options: UseRegistrationFormOptions = {}
 ): UseRegistrationFormReturn {
   const { onSuccess } = options;
-  
-  console.log('[useRegistrationForm] Hook initialized at', new Date().toISOString());
 
   // Form data state
   const [formData, setFormData] = useState<RegistrationFormData>({
@@ -352,8 +350,6 @@ export function useRegistrationForm(
     resetRateLimit,
     onSuccess
   ]);
-  
-  console.log('[useRegistrationForm] handleSubmit function created:', typeof handleSubmit);
 
   /**
    * Clear error for a specific field
