@@ -15,6 +15,8 @@
 import { ApiClient } from './apiClient';
 import { TokenManager } from './tokenManager';
 import { Validators } from './validators';
+import { setAuth } from '../auth/AuthCoordinator';
+import { jwtDecode } from 'jwt-decode';
 import {
   RegisterRequest,
   RegisterResponse,
@@ -25,8 +27,40 @@ import {
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   ResetPasswordRequest,
-  ResetPasswordResponse
+  ResetPasswordResponse,
+  JWTPayload
 } from './types';
+
+/**
+ * Derives userId from JWT token or falls back to email
+ * 
+ * This function attempts to decode the JWT token and extract the userId from the payload.
+ * If the token cannot be decoded or doesn't contain a userId, it falls back to using
+ * the email as the userId.
+ * 
+ * @param token - JWT token from backend
+ * @param email - User's email address
+ * @returns Non-empty string userId (either from JWT payload or email)
+ * 
+ * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+ */
+function deriveUserId(token: string, email: string): string {
+  try {
+    // Attempt to decode JWT and extract userId
+    const payload = jwtDecode<JWTPayload>(token);
+    
+    if (payload.userId && typeof payload.userId === 'string' && payload.userId.trim().length > 0) {
+      return payload.userId;
+    }
+    
+    // Fallback to email if userId not in payload or is empty
+    return email;
+  } catch (error) {
+    // If JWT decoding fails, use email as userId
+    console.warn('Failed to decode JWT token, using email as userId:', error);
+    return email;
+  }
+}
 
 /**
  * AuthService class provides authentication-related API methods
@@ -85,14 +119,18 @@ export class AuthService {
    * Log in an existing user
    * 
    * Validates email format and password length before making the API call.
-   * On success, stores the returned JWT token via TokenManager.
+   * On success, stores the returned JWT token via AuthCoordinator to ensure
+   * both session and JWT are synchronized.
    * Provides status updates via optional callback for UI feedback.
+   * 
+   * Handles both actual backend response format {message, email, token} and
+   * documented format {token, email, userId} for backward compatibility.
    * 
    * @param data - Login credentials containing email and password
    * @param onStatusChange - Optional callback for status updates during login flow
    * @returns Promise resolving to LoginResult with success status and user data or error
    * 
-   * Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6
+   * Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6, 3.1 (debug-form-logout-issue), 1.1, 1.2, 4.1, 4.2, 5.1, 5.2, 5.3, 5.4 (fix-login-backend-mismatch)
    */
   async login(
     data: LoginRequest,
@@ -124,20 +162,38 @@ export class AuthService {
       // Notify authenticating state
       onStatusChange?.({ state: 'authenticating', message: 'Authenticating...' });
 
-      // Make API request
+      // Make API request to backend
       const response = await this.apiClient.post<LoginResponse>('/auth/login', data);
 
-      // Store the JWT token
-      this.tokenManager.setToken(response.token);
+      // Extract fields from response
+      const { token, email: responseEmail, userId: responseUserId } = response;
+
+      // Validate required fields are present
+      if (!token || typeof token !== 'string' || token.trim().length === 0) {
+        throw new Error('Invalid login response: missing or invalid token');
+      }
+
+      if (!responseEmail || typeof responseEmail !== 'string' || responseEmail.trim().length === 0) {
+        throw new Error('Invalid login response: missing or invalid email');
+      }
+
+      // Derive userId if not provided in response (backward compatibility)
+      // If userId is in response, use it directly; otherwise derive from JWT or use email
+      const userId = responseUserId || deriveUserId(token, responseEmail);
+
+      // Use AuthCoordinator to set both session and JWT token
+      // This ensures synchronization between the two authentication mechanisms
+      // Requirements: 3.1 (debug-form-logout-issue), 1.1, 1.2 (fix-login-backend-mismatch)
+      await setAuth(token, userId, responseEmail);
 
       // Notify success state
       onStatusChange?.({ state: 'success', message: 'Login successful!' });
 
       return {
         success: true,
-        token: response.token,
-        email: response.email,
-        userId: response.userId
+        token: token,
+        email: responseEmail,
+        userId: userId
       };
     } catch (error: any) {
       // Parse error and map to user-friendly message

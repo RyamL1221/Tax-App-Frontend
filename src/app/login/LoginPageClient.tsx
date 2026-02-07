@@ -6,6 +6,12 @@ import { LoginForm } from '@/components/LoginForm';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthError } from '@/types/auth';
+import { 
+  hasSavedFormData, 
+  getFormDataMetadata, 
+  restoreFormData, 
+  clearFormData 
+} from '@/lib/auth/FormDataPreserver';
 
 export interface LoginPageClientProps {
   /**
@@ -27,11 +33,14 @@ export interface LoginPageClientProps {
  * - Responsive design (mobile and desktop)
  * - Error boundary for error handling
  * - Success redirect handling
+ * - Form data restoration after re-authentication
  * 
  * Requirements:
  * - 1.2: Redirect user after successful authentication
  * - 6.1: Centered single-column layout on mobile
  * - 6.2: Centered card layout on tablet and desktop
+ * - 8.3: Restore form data after successful login
+ * - 8.4: Display notification if form data exists
  * 
  * @param props - Component props
  * @returns Login page UI
@@ -39,6 +48,28 @@ export interface LoginPageClientProps {
 export default function LoginPageClient({ callbackUrl, expired }: LoginPageClientProps) {
   const router = useRouter();
   const [showExpiredMessage, setShowExpiredMessage] = React.useState(expired || false);
+  const [savedFormInfo, setSavedFormInfo] = React.useState<{
+    formType: string;
+    returnUrl: string;
+  } | null>(null);
+
+  /**
+   * Check for saved form data on mount
+   * Requirement 8.4: Display notification if form data exists
+   */
+  React.useEffect(() => {
+    // Check for saved form data for 1099-DIV form
+    const formType = '1099-DIV';
+    if (hasSavedFormData(formType)) {
+      const metadata = getFormDataMetadata(formType);
+      if (metadata) {
+        setSavedFormInfo({
+          formType: metadata.formType,
+          returnUrl: metadata.returnUrl || '/forms/1099-div',
+        });
+      }
+    }
+  }, []);
 
   /**
    * Clear the expired message after it's been shown
@@ -58,8 +89,30 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
   /**
    * Handle successful authentication
    * Requirement 1.2: Redirect user to dashboard or callback URL
+   * Requirement 8.3: Restore form data after successful login
    */
   const handleSuccess = (redirectUrl: string) => {
+    // Check if we have saved form data to restore
+    if (savedFormInfo) {
+      const formType = savedFormInfo.formType;
+      
+      // Restore the form data (it will be available in sessionStorage for the form component)
+      const restoredData = restoreFormData(formType);
+      
+      if (restoredData) {
+        // Form data was successfully restored
+        // Note: We don't clear it here - the form component will clear it after loading
+        // Redirect to the form page
+        router.push(savedFormInfo.returnUrl);
+        return;
+      } else {
+        // Form data couldn't be restored (expired or corrupted)
+        // Clear it and proceed with normal redirect
+        clearFormData(formType);
+      }
+    }
+    
+    // Normal redirect flow (no saved form data or restoration failed)
     const targetUrl = callbackUrl || redirectUrl || '/dashboard';
     router.push(targetUrl);
   };
@@ -147,6 +200,40 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
                           />
                         </svg>
                       </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Saved Form Data Notification */}
+              {savedFormInfo && (
+                <div 
+                  className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md"
+                  role="alert"
+                >
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg 
+                        className="h-5 w-5 text-green-400" 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        viewBox="0 0 20 20" 
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path 
+                          fillRule="evenodd" 
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" 
+                          clipRule="evenodd" 
+                        />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-sm font-medium text-green-800">
+                        Your form data has been saved
+                      </h3>
+                      <p className="mt-1 text-sm text-green-700">
+                        Your {savedFormInfo.formType} form data will be restored after you log in.
+                      </p>
                     </div>
                   </div>
                 </div>

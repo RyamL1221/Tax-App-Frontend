@@ -19,9 +19,18 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string;
-  email: string;
-  userId: string;
+  message?: string;        // Actual backend includes this
+  token: string;           // JWT token (both formats)
+  email: string;           // User email (both formats)
+  userId?: string;         // Documented format includes this, actual doesn't
+}
+
+export interface JWTPayload {
+  userId?: string;
+  email?: string;
+  iat?: number;
+  exp?: number;
+  [key: string]: any;  // Allow other fields
 }
 
 export interface LoginStatus {

@@ -1,41 +1,70 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+/**
+ * Session Management API Route
+ * POST /api/auth/session
+ * 
+ * Creates a session cookie after successful authentication with the backend.
+ * This endpoint is called by the frontend after receiving a JWT token from
+ * the external backend API to establish a session cookie for page access control.
+ * 
+ * Requirements: 3.1 (debug-form-logout-issue)
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createSession } from '@/lib/session';
 
 /**
- * GET /api/auth/session
+ * POST handler for creating a session
  * 
- * Check if the user has an active session
- * Returns authentication status
+ * Expects a JSON body with:
+ * - userId: string
+ * - email: string
  * 
- * Requirements:
- * - 8.4: Validate session and handle expiration
+ * Returns success status
  */
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
-    const { getSession } = await import('@/lib/session');
-    const sessionData = await getSession();
+    // Parse request body
+    const body = await request.json();
+    const { userId, email } = body;
 
-    // Check if session is valid and not expired
-    if (sessionData) {
-      return NextResponse.json({
-        authenticated: true,
-        session: {
-          userId: sessionData.userId,
-          email: sessionData.email,
-        },
-      });
+    // Validate required fields
+    if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid userId' },
+        { status: 400 }
+      );
     }
 
-    // No valid session found or session expired
-    return NextResponse.json({
-      authenticated: false,
-    });
+    if (!email || typeof email !== 'string' || email.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid email' },
+        { status: 400 }
+      );
+    }
+
+    // Create session cookie
+    await createSession(userId, email);
+
+    return NextResponse.json(
+      { success: true, message: 'Session created successfully' },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error('Session check error:', error);
+    console.error('Session creation API error:', error);
     
-    // Return unauthenticated on error
-    return NextResponse.json({
-      authenticated: false,
-    });
+    return NextResponse.json(
+      { success: false, error: 'Failed to create session' },
+      { status: 500 }
+    );
   }
+}
+
+/**
+ * Reject non-POST requests
+ */
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405 }
+  );
 }

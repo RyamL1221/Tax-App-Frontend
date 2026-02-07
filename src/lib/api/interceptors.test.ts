@@ -14,11 +14,13 @@ global.Response = class Response {
   status: number;
   body: any;
   headers: Map<string, string>;
+  url: string;
 
-  constructor(body: any, init?: { status?: number; headers?: Record<string, string> }) {
+  constructor(body: any, init?: { status?: number; headers?: Record<string, string>; url?: string }) {
     this.body = body;
     this.status = init?.status || 200;
     this.headers = new Map(Object.entries(init?.headers || {}));
+    this.url = init?.url || '';
   }
 } as any;
 
@@ -218,5 +220,33 @@ describe('authResponseInterceptor', () => {
     // Assert
     expect(result).toBe(response);
     expect(result.status).toBe(200);
+  });
+
+  it('should log authentication failure and redirect on 401', async () => {
+    // Arrange
+    tokenManager.setToken('test-token');
+    const testUrl = 'https://api.example.com/protected';
+    const response = new Response(null, { 
+      status: 401,
+      url: testUrl
+    });
+
+    // Spy on console methods to verify logging
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+    // Act
+    await authResponseInterceptor(response);
+
+    // Assert - verify token was cleared
+    expect(tokenManager.getToken()).toBeNull();
+
+    // Assert - verify logging occurred (in development mode)
+    // The logger should have logged the auth failure and redirect
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    
+    // Clean up
+    consoleWarnSpy.mockRestore();
+    consoleLogSpy.mockRestore();
   });
 });

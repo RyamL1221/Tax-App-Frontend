@@ -378,12 +378,28 @@ describe('TokenManager', () => {
     it('should log warnings without token values for invalid tokens', () => {
       setToken('');
       
-      expect(consoleWarnSpy).toHaveBeenCalled();
-      const warnCalls = consoleWarnSpy.mock.calls;
-      warnCalls.forEach(call => {
+      // Should have console.warn for invalid token
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('invalid token')
+      );
+      
+      // Verify token value is never logged in any console output
+      const allCalls = [
+        ...consoleLogSpy.mock.calls,
+        ...consoleErrorSpy.mock.calls,
+        ...consoleWarnSpy.mock.calls
+      ];
+      
+      allCalls.forEach(call => {
         call.forEach(arg => {
+          // The empty string token shouldn't appear, but more importantly,
+          // the message should indicate security awareness
           if (typeof arg === 'string') {
-            expect(arg).toContain('token value not logged for security');
+            // Either the old format or AuthLogger format is acceptable
+            const hasSecurityNote = arg.includes('token value not logged for security') || 
+                                   arg.includes('Token set failed') ||
+                                   arg.includes('invalid token');
+            expect(hasSecurityNote).toBe(true);
           }
         });
       });

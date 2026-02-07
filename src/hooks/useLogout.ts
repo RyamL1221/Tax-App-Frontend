@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '@/lib/api';
+import { clearAuth } from '@/lib/auth/AuthCoordinator';
+import { logAuthEvent, createAuthState } from '@/lib/auth/AuthLogger';
 
 /**
  * Return type for the useLogout hook
@@ -29,10 +30,12 @@ export interface UseLogoutReturn {
  * 
  * Handles the complete logout flow including:
  * - Loading state management
- * - Token clearing via authService
+ * - Clearing both JWT token and session via AuthCoordinator
+ * - Calling server-side logout API to clear session cookie
  * - Success handling with redirect to /login
  * - Error handling with user-friendly messages
  * - Auto-clearing errors after 3 seconds
+ * - Comprehensive logging for debugging
  * 
  * @returns Object containing logout state and handler function
  * 
@@ -58,34 +61,81 @@ export function useLogout(): UseLogoutReturn {
   /**
    * Handle logout process
    * 
-   * Clears JWT token from localStorage via authService.
-   * On success: redirects to /login page
-   * On error: displays error message for 3 seconds then clears it
+   * Uses AuthCoordinator to clear both JWT token and session cookie,
+   * ensuring both authentication mechanisms are synchronized.
    * 
    * Requirements:
-   * - 3.1: Calls authService.logout() to clear token
-   * - 3.2: Token is removed from localStorage
-   * - 3.3: Redirects to /login on success
-   * - 3.4: Displays loading state during process
-   * - 3.5: Clears token even if error occurs
+   * - 3.5 (debug-form-logout-issue): Uses AuthCoordinator.clearAuth() to clear both session and JWT
+   * - Calls /api/auth/logout to clear server-side session
+   * - Redirects to /login on success
+   * - Displays loading state during process
+   * - Adds logging for logout auth clearing
    */
   const handleLogout = useCallback(async () => {
     // Clear any previous errors and set loading state
     setError(null);
     setIsLoading(true);
     
+    logAuthEvent(
+      'Logout initiated',
+      'info',
+      createAuthState(true, true, null, null),
+      {
+        operation: 'logout',
+        source: 'useLogout',
+      }
+    );
+    
     try {
-      // Clear JWT token from localStorage (synchronous operation)
-      authService.logout();
+      // Call server-side logout API to clear session cookie
+      // This must happen before clearing client-side JWT to ensure proper coordination
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to clear session');
+      }
+      
+      // Clear both JWT token and session using AuthCoordinator
+      // This ensures both authentication mechanisms are synchronized
+      // Requirements: 3.5 (debug-form-logout-issue)
+      clearAuth('user-logout');
+      
+      logAuthEvent(
+        'Logout completed successfully',
+        'info',
+        createAuthState(false, false, null, null),
+        {
+          operation: 'logout',
+          source: 'useLogout',
+          sessionCleared: true,
+          jwtCleared: true,
+        }
+      );
       
       // Success - redirect to login page
       // Keep loading state true until redirect completes
       router.push('/login');
     } catch (err) {
-      // This should rarely happen since logout is synchronous
-      // But we handle it gracefully just in case
+      // Handle errors gracefully
       setIsLoading(false);
-      setError('Failed to log out. Please try again.');
+      const errorMessage = 'Failed to log out. Please try again.';
+      setError(errorMessage);
+      
+      logAuthEvent(
+        'Logout failed',
+        'error',
+        createAuthState(false, false, null, null),
+        {
+          operation: 'logout',
+          source: 'useLogout',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        }
+      );
       
       // Auto-clear error after 3 seconds
       setTimeout(() => {

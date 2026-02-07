@@ -5,41 +5,65 @@
  * - Initial state
  * - Loading state management
  * - Successful logout with redirect
- * - Error handling (rare cases)
+ * - Error handling (API failures)
  * - Error auto-clear after 3 seconds
- * - Token clearing via authService
+ * - AuthCoordinator integration for clearing both session and JWT
+ * - Server-side session clearing via API route
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import { useLogout } from './useLogout';
-import { authService } from '@/lib/api';
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
-// Mock authService
-jest.mock('@/lib/api', () => ({
-  authService: {
-    logout: jest.fn(),
-  },
+// Mock AuthCoordinator
+jest.mock('@/lib/auth/AuthCoordinator', () => ({
+  clearAuth: jest.fn(),
 }));
+
+// Mock AuthLogger
+jest.mock('@/lib/auth/AuthLogger', () => ({
+  logAuthEvent: jest.fn(),
+  createAuthState: jest.fn((hasSession, hasJWT, userId, email) => ({
+    hasSession,
+    hasJWT,
+    isAuthenticated: hasSession && hasJWT,
+    userId,
+    email,
+  })),
+}));
+
+// Import mocked functions
+import { clearAuth } from '@/lib/auth/AuthCoordinator';
+import { logAuthEvent } from '@/lib/auth/AuthLogger';
 
 describe('useLogout', () => {
   const mockPush = jest.fn();
-  const mockLogout = authService.logout as jest.Mock;
+  const mockClearAuth = clearAuth as jest.Mock;
+  const mockLogAuthEvent = logAuthEvent as jest.Mock;
   
   beforeEach(() => {
     mockPush.mockClear();
-    mockLogout.mockClear();
+    mockClearAuth.mockClear();
+    mockLogAuthEvent.mockClear();
     jest.clearAllMocks();
     
     // Setup router mock
     (useRouter as jest.Mock).mockReturnValue({
       push: mockPush,
     });
+    
+    // Mock fetch for logout API
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      } as Response)
+    );
     
     // Clear all timers
     jest.clearAllTimers();
@@ -82,14 +106,29 @@ describe('useLogout', () => {
   });
   
   describe('Successful Logout', () => {
-    it('should call authService.logout()', async () => {
+    it('should call logout API to clear server-side session', async () => {
       const { result } = renderHook(() => useLogout());
       
       await act(async () => {
         await result.current.handleLogout();
       });
       
-      expect(mockLogout).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    });
+    
+    it('should call AuthCoordinator.clearAuth() to clear both session and JWT', async () => {
+      const { result } = renderHook(() => useLogout());
+      
+      await act(async () => {
+        await result.current.handleLogout();
+      });
+      
+      expect(mockClearAuth).toHaveBeenCalledWith('user-logout');
     });
     
     it('should redirect to /login on successful logout', async () => {
@@ -123,14 +162,55 @@ describe('useLogout', () => {
       
       expect(result.current.error).toBeNull();
     });
+    
+    it('should log logout initiation', async () => {
+      const { result } = renderHook(() => useLogout());
+      
+      await act(async () => {
+        await result.current.handleLogout();
+      });
+      
+      expect(mockLogAuthEvent).toHaveBeenCalledWith(
+        'Logout initiated',
+        'info',
+        expect.any(Object),
+        expect.objectContaining({
+          operation: 'logout',
+          source: 'useLogout',
+        })
+      );
+    });
+    
+    it('should log successful logout completion', async () => {
+      const { result } = renderHook(() => useLogout());
+      
+      await act(async () => {
+        await result.current.handleLogout();
+      });
+      
+      expect(mockLogAuthEvent).toHaveBeenCalledWith(
+        'Logout completed successfully',
+        'info',
+        expect.any(Object),
+        expect.objectContaining({
+          operation: 'logout',
+          source: 'useLogout',
+          sessionCleared: true,
+          jwtCleared: true,
+        })
+      );
+    });
   });
   
   describe('Error Handling', () => {
-    it('should display error message when logout throws an error', async () => {
-      // Mock authService.logout to throw an error (rare case)
-      mockLogout.mockImplementationOnce(() => {
-        throw new Error('Unexpected error');
-      });
+    it('should display error message when API call fails', async () => {
+      // Mock fetch to fail
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ success: false }),
+        } as Response)
+      );
       
       const { result } = renderHook(() => useLogout());
       
@@ -143,9 +223,7 @@ describe('useLogout', () => {
     });
     
     it('should set loading to false after error', async () => {
-      mockLogout.mockImplementationOnce(() => {
-        throw new Error('Unexpected error');
-      });
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
       
       const { result } = renderHook(() => useLogout());
       
@@ -154,6 +232,27 @@ describe('useLogout', () => {
       });
       
       expect(result.current.isLoading).toBe(false);
+    });
+    
+    it('should log logout failure', async () => {
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
+      
+      const { result } = renderHook(() => useLogout());
+      
+      await act(async () => {
+        await result.current.handleLogout();
+      });
+      
+      expect(mockLogAuthEvent).toHaveBeenCalledWith(
+        'Logout failed',
+        'error',
+        expect.any(Object),
+        expect.objectContaining({
+          operation: 'logout',
+          source: 'useLogout',
+          error: 'Network error',
+        })
+      );
     });
   });
   
@@ -167,9 +266,7 @@ describe('useLogout', () => {
     });
     
     it('should clear error after 3 seconds', async () => {
-      mockLogout.mockImplementationOnce(() => {
-        throw new Error('Unexpected error');
-      });
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
       
       const { result } = renderHook(() => useLogout());
       
@@ -188,9 +285,7 @@ describe('useLogout', () => {
     });
     
     it('should not clear error before 3 seconds', async () => {
-      mockLogout.mockImplementationOnce(() => {
-        throw new Error('Unexpected error');
-      });
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
       
       const { result } = renderHook(() => useLogout());
       
@@ -213,9 +308,7 @@ describe('useLogout', () => {
   describe('Error State Clearing', () => {
     it('should clear previous error when new logout is initiated', async () => {
       // First logout - fails
-      mockLogout.mockImplementationOnce(() => {
-        throw new Error('Unexpected error');
-      });
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
       
       const { result } = renderHook(() => useLogout());
       
@@ -226,9 +319,12 @@ describe('useLogout', () => {
       expect(result.current.error).toBe('Failed to log out. Please try again.');
       
       // Second logout - succeeds
-      mockLogout.mockImplementationOnce(() => {
-        // Success - no error
-      });
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        } as Response)
+      );
       
       await act(async () => {
         await result.current.handleLogout();
@@ -249,7 +345,7 @@ describe('useLogout', () => {
       });
       
       expect(mockPush).toHaveBeenCalledWith('/login');
-      expect(mockLogout).toHaveBeenCalledTimes(1);
+      expect(mockClearAuth).toHaveBeenCalledTimes(1);
       
       // Second attempt - should also work
       await act(async () => {
@@ -257,7 +353,36 @@ describe('useLogout', () => {
       });
       
       expect(mockPush).toHaveBeenCalledTimes(2);
-      expect(mockLogout).toHaveBeenCalledTimes(2);
+      expect(mockClearAuth).toHaveBeenCalledTimes(2);
+    });
+  });
+  
+  describe('AuthCoordinator Integration', () => {
+    it('should clear auth after successful API call', async () => {
+      const { result } = renderHook(() => useLogout());
+      
+      await act(async () => {
+        await result.current.handleLogout();
+      });
+      
+      // Verify API was called first
+      expect(global.fetch).toHaveBeenCalled();
+      
+      // Then AuthCoordinator.clearAuth was called
+      expect(mockClearAuth).toHaveBeenCalledWith('user-logout');
+    });
+    
+    it('should not clear auth if API call fails', async () => {
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')));
+      
+      const { result } = renderHook(() => useLogout());
+      
+      await act(async () => {
+        await result.current.handleLogout();
+      });
+      
+      // AuthCoordinator.clearAuth should not be called if API fails
+      expect(mockClearAuth).not.toHaveBeenCalled();
     });
   });
 });

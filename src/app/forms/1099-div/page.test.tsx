@@ -4,8 +4,9 @@
  * Tests that the 1099-DIV form page:
  * - Renders form content for authenticated users
  * - Redirects unauthenticated users to login page
+ * - Passes null token to client component (JWT retrieved from localStorage)
  * 
- * **Validates: Requirements 3.2**
+ * **Validates: Requirements 1.1, 3.5**
  */
 
 import { redirect } from 'next/navigation';
@@ -22,6 +23,13 @@ jest.mock('@/lib/session', () => ({
   getSession: jest.fn(),
 }));
 
+// Mock Form1099DivClient to avoid rendering complexity
+jest.mock('./Form1099DivClient', () => {
+  return function MockForm1099DivClient({ initialToken }: { initialToken: string | null }) {
+    return <div data-testid="form-client" data-token={initialToken}>Form1099DivClient</div>;
+  };
+});
+
 // Import the page component after mocks are set up
 import Form1099DivPage from './page';
 
@@ -30,8 +38,8 @@ describe('1099-DIV Form Page Server Component', () => {
     jest.clearAllMocks();
   });
 
-  describe('Authenticated User Access - Requirement 3.2', () => {
-    test('renders form page when user has valid session', async () => {
+  describe('Authenticated User Access - Requirement 1.1, 3.5', () => {
+    it('renders form page when user has valid session', async () => {
       // Arrange: Mock getSession to return valid session data
       const mockSessionData: SessionData = {
         userId: 'user-123',
@@ -58,29 +66,45 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(getSession).toHaveBeenCalledTimes(1);
     });
 
-    test('renders form page for any valid session data', async () => {
-      // Arrange: Mock getSession with different valid session data
+    it('passes null token to Form1099DivClient (JWT retrieved from localStorage)', async () => {
+      // Arrange: Mock valid session
       const mockSessionData: SessionData = {
-        userId: 'different-user-456',
+        userId: 'user-456',
         email: 'another@test.com',
         createdAt: Date.now() - 5000,
-        expiresAt: Date.now() + 7200000, // 2 hours from now
+        expiresAt: Date.now() + 7200000,
       };
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
-
-      // Mock redirect
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
 
       // Act: Call the page component
       const result = await Form1099DivPage();
 
-      // Assert: Should render form page without redirect
-      expect(mockRedirect).not.toHaveBeenCalled();
+      // Assert: Should pass null token (client will retrieve from localStorage)
       expect(result).toBeDefined();
-      expect(getSession).toHaveBeenCalled();
+      
+      // Find the Form1099DivClient component in the tree
+      const findClientComponent = (node: any): any => {
+        if (!node) return null;
+        if (node.type?.name === 'MockForm1099DivClient') return node;
+        if (node.props?.children) {
+          if (Array.isArray(node.props.children)) {
+            for (const child of node.props.children) {
+              const found = findClientComponent(child);
+              if (found) return found;
+            }
+          } else {
+            return findClientComponent(node.props.children);
+          }
+        }
+        return null;
+      };
+      
+      const clientComponent = findClientComponent(result);
+      expect(clientComponent).toBeDefined();
+      expect(clientComponent.props.initialToken).toBeNull();
     });
 
-    test('does not redirect when session is valid', async () => {
+    it('does not redirect when session is valid', async () => {
       // Arrange: Mock valid session
       const mockSessionData: SessionData = {
         userId: 'user-789',
@@ -99,7 +123,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(mockRedirect).not.toHaveBeenCalled();
     });
 
-    test('renders form content with correct structure', async () => {
+    it('renders form content with correct structure', async () => {
       // Arrange: Mock valid session
       const mockSessionData: SessionData = {
         userId: 'user-content',
@@ -115,14 +139,14 @@ describe('1099-DIV Form Page Server Component', () => {
       // Assert: Verify the rendered structure
       expect(result).toBeDefined();
       expect(result.type).toBe('div');
-      expect(result.props.className).toContain('container');
+      expect(result.props.className).toContain('min-h-screen');
       
       // Verify it contains the expected content structure
       const props = result.props;
       expect(props.children).toBeDefined();
     });
 
-    test('displays 1099-DIV form title for authenticated users', async () => {
+    it('displays 1099-DIV form title for authenticated users', async () => {
       // Arrange: Mock valid session
       const mockSessionData: SessionData = {
         userId: 'user-title',
@@ -144,8 +168,8 @@ describe('1099-DIV Form Page Server Component', () => {
     });
   });
 
-  describe('Unauthenticated User Redirect - Requirement 3.2', () => {
-    test('redirects to login when no session exists', async () => {
+  describe('Unauthenticated User Redirect - Requirement 3.5', () => {
+    it('redirects to login when no session exists', async () => {
       // Arrange: Mock getSession to return null (no session)
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -156,22 +180,17 @@ describe('1099-DIV Form Page Server Component', () => {
       });
 
       // Act & Assert: Calling the page should trigger redirect
-      try {
-        await Form1099DivPage();
-        // If we reach here, redirect was not called - test should fail
-        expect(true).toBe(false);
-      } catch (error: any) {
-        // Redirect should have been called
-        expect(mockRedirect).toHaveBeenCalledTimes(1);
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-        expect(error.message).toBe('NEXT_REDIRECT: /login');
-      }
+      await expect(Form1099DivPage()).rejects.toThrow('NEXT_REDIRECT: /login');
+      
+      // Redirect should have been called
+      expect(mockRedirect).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
 
       // Verify getSession was called
       expect(getSession).toHaveBeenCalledTimes(1);
     });
 
-    test('redirects to login when session is undefined', async () => {
+    it('redirects to login when session is undefined', async () => {
       // Arrange: Mock getSession to return undefined
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(undefined as any);
 
@@ -182,18 +201,12 @@ describe('1099-DIV Form Page Server Component', () => {
       });
 
       // Act & Assert
-      try {
-        await Form1099DivPage();
-        expect(true).toBe(false); // Should not reach here
-      } catch (error: any) {
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-        expect(error.message).toBe('NEXT_REDIRECT: /login');
-      }
-
+      await expect(Form1099DivPage()).rejects.toThrow('NEXT_REDIRECT: /login');
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
       expect(getSession).toHaveBeenCalled();
     });
 
-    test('does not render form page when session is invalid', async () => {
+    it('does not render form page when session is invalid', async () => {
       // Arrange: Mock getSession to return null
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -206,8 +219,8 @@ describe('1099-DIV Form Page Server Component', () => {
       // Act & Assert
       let formPageRendered = false;
       try {
-        const result = await Form1099DivPage();
-        formPageRendered = result !== null;
+        await Form1099DivPage();
+        formPageRendered = true;
       } catch (error: any) {
         // Expected redirect error
         formPageRendered = false;
@@ -218,7 +231,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(mockRedirect).toHaveBeenCalled();
     });
 
-    test('redirect always targets /login path', async () => {
+    it('redirect always targets /login path', async () => {
       // Arrange: Mock getSession to return null
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -244,7 +257,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(calls[0][0]).toBe('/login');
     });
 
-    test('prevents unauthorized access to form data', async () => {
+    it('prevents unauthorized access to form data', async () => {
       // Arrange: Mock getSession to return null
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -270,7 +283,7 @@ describe('1099-DIV Form Page Server Component', () => {
   });
 
   describe('Session Management Integration', () => {
-    test('calls getSession to verify authentication', async () => {
+    it('calls getSession to verify authentication', async () => {
       // Arrange: Mock valid session
       const mockSessionData: SessionData = {
         userId: 'user-123',
@@ -287,7 +300,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(getSession).toHaveBeenCalledTimes(1);
     });
 
-    test('calls getSession before rendering or redirecting', async () => {
+    it('calls getSession before rendering or redirecting', async () => {
       // Arrange: Mock null session
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -318,7 +331,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(callOrder).toEqual(['getSession', 'redirect']);
     });
 
-    test('uses existing session management system', async () => {
+    it('uses existing session management system', async () => {
       // Arrange: Mock valid session
       const mockSessionData: SessionData = {
         userId: 'user-123',
@@ -338,7 +351,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(jest.isMockFunction(getSession)).toBe(true);
     });
 
-    test('integrates with session data structure', async () => {
+    it('integrates with session data structure', async () => {
       // Arrange: Mock session with all required fields
       const mockSessionData: SessionData = {
         userId: 'user-abc',
@@ -367,7 +380,7 @@ describe('1099-DIV Form Page Server Component', () => {
   });
 
   describe('Edge Cases', () => {
-    test('handles session with expired timestamp', async () => {
+    it('handles session with expired timestamp', async () => {
       // Arrange: Mock getSession to return null (expired sessions return null)
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -377,15 +390,11 @@ describe('1099-DIV Form Page Server Component', () => {
       });
 
       // Act & Assert
-      try {
-        await Form1099DivPage();
-        expect(true).toBe(false);
-      } catch (error: any) {
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-      }
+      await expect(Form1099DivPage()).rejects.toThrow('NEXT_REDIRECT: /login');
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
     });
 
-    test('handles malformed session data', async () => {
+    it('handles malformed session data', async () => {
       // Arrange: Mock getSession to return null (malformed sessions return null)
       (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
 
@@ -395,15 +404,11 @@ describe('1099-DIV Form Page Server Component', () => {
       });
 
       // Act & Assert
-      try {
-        await Form1099DivPage();
-        expect(true).toBe(false);
-      } catch (error: any) {
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-      }
+      await expect(Form1099DivPage()).rejects.toThrow('NEXT_REDIRECT: /login');
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
     });
 
-    test('handles concurrent session checks', async () => {
+    it('handles concurrent session checks', async () => {
       // Arrange: Mock valid session
       const mockSessionData: SessionData = {
         userId: 'user-concurrent',
@@ -433,7 +438,7 @@ describe('1099-DIV Form Page Server Component', () => {
   });
 
   describe('Component Metadata', () => {
-    test('exports metadata with correct title', () => {
+    it('exports metadata with correct title', () => {
       // Import metadata
       const { metadata } = require('./page');
 
@@ -442,7 +447,7 @@ describe('1099-DIV Form Page Server Component', () => {
       expect(metadata.title).toBe('1099-DIV Form | Tax App');
     });
 
-    test('exports metadata with correct description', () => {
+    it('exports metadata with correct description', () => {
       // Import metadata
       const { metadata } = require('./page');
 
