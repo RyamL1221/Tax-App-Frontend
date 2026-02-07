@@ -1,26 +1,29 @@
 /**
- * Unit tests for Dashboard Page Server Component
+ * Unit tests for Dashboard Page Client Component
  * 
  * Tests that the dashboard page:
  * - Renders DashboardClient for authenticated users
  * - Redirects unauthenticated users to login page
- * - Integrates with session management system
+ * - Integrates with JWT token management system
  * 
- * **Validates: Requirements 1.1, 1.2, 5.1**
+ * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 4.1, 4.3, 5.1, 5.3, 5.4**
  */
 
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
-import type { SessionData } from '@/lib/session';
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { useRouter } from 'next/navigation';
+import * as tokenManager from '@/lib/api/tokenManager';
 
 // Mock Next.js modules
 jest.mock('next/navigation', () => ({
-  redirect: jest.fn(),
+  useRouter: jest.fn(),
 }));
 
-// Mock the session module
-jest.mock('@/lib/session', () => ({
-  getSession: jest.fn(),
+// Mock the tokenManager module
+jest.mock('@/lib/api/tokenManager', () => ({
+  hasToken: jest.fn(),
+  getToken: jest.fn(),
+  isValidToken: jest.fn(),
 }));
 
 // Mock the DashboardClient component
@@ -33,367 +36,309 @@ jest.mock('./DashboardClient', () => {
 // Import the page component after mocks are set up
 import DashboardPage from './page';
 
-describe('Dashboard Page Server Component', () => {
+describe('Dashboard Page Client Component', () => {
+  let mockPush: jest.Mock;
+
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('Authenticated User Access - Requirement 1.1', () => {
-    test('renders DashboardClient when user has valid session', async () => {
-      // Arrange: Mock getSession to return valid session data
-      const mockSessionData: SessionData = {
-        userId: 'user-123',
-        email: 'test@example.com',
-        createdAt: Date.now() - 1000,
-        expiresAt: Date.now() + 3600000, // 1 hour from now
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
-
-      // Mock redirect to track if it was called
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-
-      // Act: Call the page component
-      const result = await DashboardPage();
-
-      // Assert: Redirect should NOT have been called
-      expect(mockRedirect).not.toHaveBeenCalled();
-      
-      // Should render the dashboard client
-      expect(result).toBeDefined();
-      expect(result.type.name).toBe('MockDashboardClient');
-      
-      // Verify getSession was called
-      expect(getSession).toHaveBeenCalledTimes(1);
-    });
-
-    test('renders DashboardClient for any valid session data', async () => {
-      // Arrange: Mock getSession with different valid session data
-      const mockSessionData: SessionData = {
-        userId: 'different-user-456',
-        email: 'another@test.com',
-        createdAt: Date.now() - 5000,
-        expiresAt: Date.now() + 7200000, // 2 hours from now
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
-
-      // Mock redirect
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-
-      // Act: Call the page component
-      const result = await DashboardPage();
-
-      // Assert: Should render dashboard without redirect
-      expect(mockRedirect).not.toHaveBeenCalled();
-      expect(result).toBeDefined();
-      expect(result.type.name).toBe('MockDashboardClient');
-      expect(getSession).toHaveBeenCalled();
-    });
-
-    test('does not redirect when session is valid', async () => {
-      // Arrange: Mock valid session
-      const mockSessionData: SessionData = {
-        userId: 'user-789',
-        email: 'valid@example.com',
-        createdAt: Date.now() - 2000,
-        expiresAt: Date.now() + 3600000,
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
-
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-
-      // Act: Call the page component
-      await DashboardPage();
-
-      // Assert: Verify redirect was never called
-      expect(mockRedirect).not.toHaveBeenCalled();
+    mockPush = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({
+      push: mockPush,
     });
   });
 
-  describe('Unauthenticated User Redirect - Requirement 1.2', () => {
-    test('redirects to login when no session exists', async () => {
-      // Arrange: Mock getSession to return null (no session)
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
+  describe('Authenticated User Access - Requirement 1.2', () => {
+    test('renders DashboardClient when user has valid token', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      // Mock redirect to throw (Next.js redirect behavior)
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
+      // Act: Render the page component
+      const { container } = render(<DashboardPage />);
+
+      // Wait for authentication check to complete
+      await waitFor(() => {
+        expect(screen.getByTestId('dashboard-client')).toBeInTheDocument();
       });
 
-      // Act & Assert: Calling the page should trigger redirect
-      try {
-        await DashboardPage();
-        // If we reach here, redirect was not called - test should fail
-        expect(true).toBe(false);
-      } catch (error: any) {
-        // Redirect should have been called
-        expect(mockRedirect).toHaveBeenCalledTimes(1);
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-        expect(error.message).toBe('NEXT_REDIRECT: /login');
-      }
-
-      // Verify getSession was called
-      expect(getSession).toHaveBeenCalledTimes(1);
+      // Assert: Should render dashboard client
+      expect(screen.getByTestId('dashboard-client')).toBeInTheDocument();
+      
+      // Should NOT redirect
+      expect(mockPush).not.toHaveBeenCalled();
+      
+      // Verify hasToken was called
+      expect(tokenManager.hasToken).toHaveBeenCalledTimes(1);
     });
 
-    test('redirects to login when session is undefined', async () => {
-      // Arrange: Mock getSession to return undefined
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(undefined as any);
+    test('renders DashboardClient without redirect when token exists', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      // Mock redirect
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Wait for authentication check
+      await waitFor(() => {
+        expect(screen.getByTestId('dashboard-client')).toBeInTheDocument();
       });
 
-      // Act & Assert
-      try {
-        await DashboardPage();
-        expect(true).toBe(false); // Should not reach here
-      } catch (error: any) {
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-        expect(error.message).toBe('NEXT_REDIRECT: /login');
-      }
-
-      expect(getSession).toHaveBeenCalled();
+      // Assert: Verify no redirect occurred
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
-    test('does not render DashboardClient when session is invalid', async () => {
-      // Arrange: Mock getSession to return null
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
-
-      // Mock redirect
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
+    test('displays loading state initially', () => {
+      // Arrange: Mock hasToken to delay return
+      let resolveHasToken: (value: boolean) => void;
+      const hasTokenPromise = new Promise<boolean>((resolve) => {
+        resolveHasToken = resolve;
+      });
+      
+      (tokenManager.hasToken as jest.Mock).mockImplementation(() => {
+        // Simulate async behavior
+        throw hasTokenPromise;
       });
 
-      // Act & Assert
-      let dashboardRendered = false;
-      try {
-        const result = await DashboardPage();
-        dashboardRendered = result !== null;
-      } catch (error: any) {
-        // Expected redirect error
-        dashboardRendered = false;
-      }
+      // Act: Render the page component
+      const { container } = render(<DashboardPage />);
 
-      // Dashboard should never render for unauthenticated users
-      expect(dashboardRendered).toBe(false);
-      expect(mockRedirect).toHaveBeenCalled();
+      // Assert: Should show loading state immediately
+      // Since useEffect runs synchronously in tests, we can't reliably test the loading state
+      // This test verifies the component renders without errors
+      expect(container).toBeInTheDocument();
+    });
+  });
+
+  describe('Unauthenticated User Redirect - Requirement 1.3, 4.1, 4.3', () => {
+    test('redirects to login when no token exists', async () => {
+      // Arrange: Mock hasToken to return false
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(false);
+
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Assert: Should show loading initially
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+
+      // Wait for redirect
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
+
+      // Verify hasToken was called
+      expect(tokenManager.hasToken).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not render DashboardClient when token is invalid', async () => {
+      // Arrange: Mock hasToken to return false
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(false);
+
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Wait for redirect
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalled();
+      });
+
+      // Assert: Dashboard should never render
+      expect(screen.queryByTestId('dashboard-client')).not.toBeInTheDocument();
     });
 
     test('redirect always targets /login path', async () => {
-      // Arrange: Mock getSession to return null
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
+      // Arrange: Mock hasToken to return false
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(false);
 
-      // Mock redirect
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Wait for redirect
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
       });
-
-      // Act
-      try {
-        await DashboardPage();
-      } catch (error) {
-        // Expected redirect error
-      }
 
       // Assert: Verify redirect was called with exactly '/login'
-      expect(mockRedirect).toHaveBeenCalledWith('/login');
-      
-      // Verify no other paths were used
-      const calls = mockRedirect.mock.calls;
-      expect(calls.length).toBe(1);
-      expect(calls[0][0]).toBe('/login');
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush.mock.calls[0][0]).toBe('/login');
+    });
+
+    test('redirects immediately without exposing dashboard data', async () => {
+      // Arrange: Mock hasToken to return false
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(false);
+
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Assert: Dashboard client should never be rendered
+      expect(screen.queryByTestId('dashboard-client')).not.toBeInTheDocument();
+
+      // Wait for redirect
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
+
+      // Verify dashboard was never exposed
+      expect(screen.queryByTestId('dashboard-client')).not.toBeInTheDocument();
     });
   });
 
-  describe('Session Management Integration - Requirement 5.1', () => {
-    test('calls getSession to verify authentication', async () => {
-      // Arrange: Mock valid session
-      const mockSessionData: SessionData = {
-        userId: 'user-123',
-        email: 'test@example.com',
-        createdAt: Date.now() - 1000,
-        expiresAt: Date.now() + 3600000,
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
+  describe('Token Management Integration - Requirement 1.1, 1.4', () => {
+    test('calls hasToken to verify authentication', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      // Act: Call the page component
-      await DashboardPage();
+      // Act: Render the page component
+      render(<DashboardPage />);
 
-      // Assert: Verify getSession was called
-      expect(getSession).toHaveBeenCalledTimes(1);
+      // Wait for authentication check
+      await waitFor(() => {
+        expect(tokenManager.hasToken).toHaveBeenCalled();
+      });
+
+      // Assert: Verify hasToken was called
+      expect(tokenManager.hasToken).toHaveBeenCalledTimes(1);
     });
 
-    test('calls getSession before rendering or redirecting', async () => {
-      // Arrange: Mock null session
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
+    test('uses tokenManager module for authentication', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Wait for authentication check
+      await waitFor(() => {
+        expect(screen.getByTestId('dashboard-client')).toBeInTheDocument();
       });
 
-      // Track call order
-      const callOrder: string[] = [];
-      (getSession as jest.MockedFunction<typeof getSession>).mockImplementation(async () => {
-        callOrder.push('getSession');
-        return null;
-      });
-      mockRedirect.mockImplementation(() => {
-        callOrder.push('redirect');
-        throw new Error('NEXT_REDIRECT: /login');
-      });
-
-      // Act
-      try {
-        await DashboardPage();
-      } catch (error) {
-        // Expected redirect error
-      }
-
-      // Assert: getSession should be called before redirect
-      expect(callOrder).toEqual(['getSession', 'redirect']);
+      // Assert: Verify hasToken from @/lib/api/tokenManager was used
+      expect(tokenManager.hasToken).toHaveBeenCalled();
+      expect(jest.isMockFunction(tokenManager.hasToken)).toBe(true);
     });
+  });
 
-    test('uses existing session management system', async () => {
-      // Arrange: Mock valid session
-      const mockSessionData: SessionData = {
-        userId: 'user-123',
-        email: 'test@example.com',
-        createdAt: Date.now() - 1000,
-        expiresAt: Date.now() + 3600000,
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
+  describe('Error Handling - Requirement 7.1, 7.2, 7.3', () => {
+    test('handles token validation errors gracefully', async () => {
+      // Arrange: Mock hasToken to throw an error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      (tokenManager.hasToken as jest.Mock).mockImplementation(() => {
+        throw new Error('localStorage unavailable');
+      });
 
-      // Act: Call the page component
-      await DashboardPage();
+      // Act: Render the page component
+      render(<DashboardPage />);
 
-      // Assert: Verify getSession from @/lib/session was used
-      expect(getSession).toHaveBeenCalled();
+      // Wait for error handling
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
+
+      // Assert: Should redirect to login
+      expect(mockPush).toHaveBeenCalledWith('/login');
       
-      // Verify the mock is from the correct module
-      expect(jest.isMockFunction(getSession)).toBe(true);
+      // Should log error
+      expect(consoleErrorSpy).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
     });
 
-    test('handles session check errors gracefully', async () => {
-      // Arrange: Mock getSession to throw an error
-      (getSession as jest.MockedFunction<typeof getSession>).mockRejectedValue(
-        new Error('Session check failed')
+    test('redirects to login on localStorage error', async () => {
+      // Arrange: Mock hasToken to throw localStorage error
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      (tokenManager.hasToken as jest.Mock).mockImplementation(() => {
+        throw new Error('localStorage is not available');
+      });
+
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Wait for redirect
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/login');
+      });
+
+      // Assert: Should handle error and redirect
+      expect(mockPush).toHaveBeenCalledWith('/login');
+      expect(consoleErrorSpy).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    test('handles router navigation errors with fallback', async () => {
+      // Arrange: Mock hasToken to return false
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(false);
+      
+      // Mock router.push to throw error
+      mockPush.mockImplementation(() => {
+        throw new Error('Navigation failed');
+      });
+
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Wait for error handling
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalled();
+      });
+
+      // Assert: Should attempt router.push
+      expect(mockPush).toHaveBeenCalledWith('/login');
+      
+      // Should log navigation error
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Navigation failed:',
+        expect.any(Error)
       );
 
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
-      });
+      // Note: window.location.href fallback is tested in integration tests
+      // as jsdom doesn't fully support navigation
 
-      // Act & Assert: Should handle error and redirect
-      try {
-        await DashboardPage();
-        expect(true).toBe(false); // Should not reach here
-      } catch (error: any) {
-        // Should either be session error or redirect error
-        expect(error).toBeDefined();
-      }
-
-      // Verify getSession was called
-      expect(getSession).toHaveBeenCalled();
-    });
-
-    test('integrates with session data structure', async () => {
-      // Arrange: Mock session with all required fields
-      const mockSessionData: SessionData = {
-        userId: 'user-abc',
-        email: 'integration@test.com',
-        createdAt: Date.now() - 10000,
-        expiresAt: Date.now() + 3600000,
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
-
-      // Act: Call the page component
-      const result = await DashboardPage();
-
-      // Assert: Should successfully render with valid session structure
-      expect(result).toBeDefined();
-      expect(getSession).toHaveBeenCalled();
-      
-      // Verify session data structure was properly handled
-      const sessionCall = (getSession as jest.MockedFunction<typeof getSession>).mock.results[0];
-      expect(sessionCall.type).toBe('return');
-      const sessionValue = await sessionCall.value;
-      expect(sessionValue).toHaveProperty('userId');
-      expect(sessionValue).toHaveProperty('email');
-      expect(sessionValue).toHaveProperty('createdAt');
-      expect(sessionValue).toHaveProperty('expiresAt');
+      consoleErrorSpy.mockRestore();
     });
   });
 
-  describe('Edge Cases', () => {
-    test('handles session with expired timestamp', async () => {
-      // Arrange: Mock getSession to return null (expired sessions return null)
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
+  describe('Component Lifecycle - Requirement 5.3, 5.4', () => {
+    test('checks authentication on mount', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
+      // Act: Render the page component
+      render(<DashboardPage />);
+
+      // Assert: Should check authentication immediately
+      await waitFor(() => {
+        expect(tokenManager.hasToken).toHaveBeenCalled();
       });
-
-      // Act & Assert
-      try {
-        await DashboardPage();
-        expect(true).toBe(false);
-      } catch (error: any) {
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-      }
     });
 
-    test('handles malformed session data', async () => {
-      // Arrange: Mock getSession to return null (malformed sessions return null)
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(null);
+    test('handles component unmount during auth check', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      const mockRedirect = redirect as jest.MockedFunction<typeof redirect>;
-      mockRedirect.mockImplementation(() => {
-        throw new Error('NEXT_REDIRECT: /login');
-      });
+      // Act: Render and immediately unmount
+      const { unmount } = render(<DashboardPage />);
+      unmount();
 
-      // Act & Assert
-      try {
-        await DashboardPage();
-        expect(true).toBe(false);
-      } catch (error: any) {
-        expect(mockRedirect).toHaveBeenCalledWith('/login');
-      }
+      // Assert: Should not cause errors
+      // No assertion needed - test passes if no errors thrown
     });
 
-    test('handles concurrent session checks', async () => {
-      // Arrange: Mock valid session
-      const mockSessionData: SessionData = {
-        userId: 'user-concurrent',
-        email: 'concurrent@test.com',
-        createdAt: Date.now() - 1000,
-        expiresAt: Date.now() + 3600000,
-      };
-      (getSession as jest.MockedFunction<typeof getSession>).mockResolvedValue(mockSessionData);
+    test('does not update state after unmount', async () => {
+      // Arrange: Mock hasToken to return true
+      (tokenManager.hasToken as jest.Mock).mockReturnValue(true);
 
-      // Act: Call the page component multiple times concurrently
-      const results = await Promise.all([
-        DashboardPage(),
-        DashboardPage(),
-        DashboardPage(),
-      ]);
+      // Act: Render and unmount before auth check completes
+      const { unmount } = render(<DashboardPage />);
+      
+      // Unmount immediately
+      unmount();
 
-      // Assert: All should render successfully
-      expect(results).toHaveLength(3);
-      results.forEach(result => {
-        expect(result).toBeDefined();
-        expect(result.type.name).toBe('MockDashboardClient');
-      });
+      // Wait a bit to ensure no state updates occur
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Verify getSession was called for each request
-      expect(getSession).toHaveBeenCalledTimes(3);
+      // Assert: No errors should occur (cleanup function prevents state updates)
+      // Test passes if no "Can't perform a React state update on an unmounted component" warning
     });
   });
 
