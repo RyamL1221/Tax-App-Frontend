@@ -341,24 +341,4 @@ describe('Dashboard Page Client Component', () => {
       // Test passes if no "Can't perform a React state update on an unmounted component" warning
     });
   });
-
-  describe('Component Metadata', () => {
-    test('exports metadata with correct title', () => {
-      // Import metadata
-      const { metadata } = require('./page');
-
-      // Assert: Verify metadata is defined
-      expect(metadata).toBeDefined();
-      expect(metadata.title).toBe('Tax Form Dashboard | Tax App');
-    });
-
-    test('exports metadata with correct description', () => {
-      // Import metadata
-      const { metadata } = require('./page');
-
-      // Assert: Verify description
-      expect(metadata).toBeDefined();
-      expect(metadata.description).toBe('Select and access tax forms for completion');
-    });
-  });
 });

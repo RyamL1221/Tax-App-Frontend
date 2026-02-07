@@ -80,11 +80,3 @@ export default function DashboardPage() {
   // Render dashboard for authenticated users
   return <DashboardClient />;
 }
-
-/**
- * Metadata for the dashboard page
- */
-export const metadata = {
-  title: 'Tax Form Dashboard | Tax App',
-  description: 'Select and access tax forms for completion',
-};
