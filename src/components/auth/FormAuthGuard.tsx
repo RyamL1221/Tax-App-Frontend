@@ -1,43 +1,44 @@
 'use client';
 
 /**
- * FormAuthGuard - Ensures valid authentication before rendering forms
+ * FormAuthGuard - Ensures valid JWT authentication before rendering forms
  * 
- * This component wraps form pages to validate authentication state before rendering.
+ * This component wraps form pages to validate JWT token presence before rendering.
  * It performs the following checks:
- * 1. Validates both session and JWT token are present
- * 2. Attempts JWT recovery if missing but session appears valid
- * 3. Redirects to login with return URL if authentication cannot be recovered
- * 4. Shows loading state during validation
- * 5. Shows error state for validation failures
+ * 1. Validates JWT token is present using AuthCoordinator
+ * 2. Redirects to login with return URL if JWT token is missing
+ * 3. Shows loading state during validation
+ * 4. Shows error state for validation failures
  * 
- * Requirements: 4.1, 4.2, 4.3, 6.1, 6.2, 6.3, 6.4
+ * Requirements (jwt-only-authentication spec):
+ * - 3.3: Form components use FormAuthGuard with JWT token validation
+ * - 4.1: Guards use AuthCoordinator.getAuthState() for token validation
+ * - 4.2: Guards redirect to login with return URL when JWT missing
+ * - 4.3: Guards clear invalid tokens before redirecting
+ * - 4.4: Guards provide loading state during verification
  */
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { validateAuth, recoverJWT, getAuthState } from '@/lib/auth/AuthCoordinator';
-import { logAuthEvent, logRedirect, createAuthState } from '@/lib/auth/AuthLogger';
+import { getAuthState } from '@/lib/auth/AuthCoordinator';
+import { clearToken } from '@/lib/api/tokenManager';
 
 export interface FormAuthGuardProps {
   children: React.ReactNode;
-  requiresJWT?: boolean;
   onAuthFailure?: (reason: string) => void;
 }
 
 /**
  * FormAuthGuard component
  * 
- * Wraps form pages to ensure authentication is valid before rendering.
- * Handles JWT recovery and redirects to login when necessary.
+ * Wraps form pages to ensure JWT authentication is valid before rendering.
+ * Redirects to login when JWT token is missing or invalid.
  * 
  * @param children - The form content to render when authenticated
- * @param requiresJWT - Whether JWT token is required (default: true)
  * @param onAuthFailure - Optional callback when authentication fails
  */
 export function FormAuthGuard({
   children,
-  requiresJWT = true,
   onAuthFailure,
 }: FormAuthGuardProps): JSX.Element {
   const router = useRouter();
@@ -48,89 +49,62 @@ export function FormAuthGuard({
   useEffect(() => {
     async function checkAuth() {
       try {
-        logAuthEvent(
-          'FormAuthGuard: Starting authentication validation',
-          'info',
-          getAuthState(),
-          {
+        console.log('[FormAuthGuard] Starting JWT authentication validation', {
+          pathname,
+        });
+
+        // Validate current authentication state using AuthCoordinator
+        const auth = await getAuthState();
+
+        console.log('[FormAuthGuard] Auth state received', {
+          isAuthenticated: auth.isAuthenticated,
+          hasJWT: auth.hasJWT,
+          hasSession: auth.hasSession,
+          authMethod: auth.authMethod,
+          pathname,
+        });
+
+        if (auth.isAuthenticated && auth.hasJWT) {
+          // Authentication is valid - user has JWT token
+          console.log('[FormAuthGuard] Authentication valid - JWT token present', {
             pathname,
-            requiresJWT,
-          }
-        );
-
-        // Validate current authentication state
-        const validation = validateAuth();
-
-        if (validation.valid) {
-          // Authentication is valid
-          logAuthEvent(
-            'FormAuthGuard: Authentication valid',
-            'info',
-            getAuthState(),
-            {
-              pathname,
-            }
-          );
+          });
           setAuthState('authenticated');
           return;
         }
 
-        // Authentication is invalid - check if we can recover
-        if (validation.canRecover && requiresJWT) {
-          logAuthEvent(
-            'FormAuthGuard: Attempting JWT recovery',
-            'info',
-            getAuthState(),
-            {
+        // Authentication is invalid - no JWT token or invalid
+        const reason = auth.reason || 'JWT token required for form access';
+        
+        console.warn('[FormAuthGuard] Authentication failed - redirecting to login', {
+          pathname,
+          reason,
+          hasJWT: auth.hasJWT,
+          hasSession: auth.hasSession,
+        });
+
+        // Clear any invalid tokens
+        if (!auth.hasJWT) {
+          try {
+            await clearToken('FormAuthGuard');
+            console.log('[FormAuthGuard] Cleared invalid token', { pathname });
+          } catch (clearError) {
+            console.error('[FormAuthGuard] Error clearing token', {
+              error: clearError instanceof Error ? clearError.message : String(clearError),
               pathname,
-              reason: validation.reason,
-            }
-          );
-
-          // Attempt to recover JWT from session
-          const recoveredJWT = await recoverJWT();
-
-          if (recoveredJWT) {
-            // Recovery successful
-            logAuthEvent(
-              'FormAuthGuard: JWT recovery successful',
-              'info',
-              getAuthState(),
-              {
-                pathname,
-              }
-            );
-            setAuthState('authenticated');
-            return;
+            });
           }
-
-          // Recovery failed
-          logAuthEvent(
-            'FormAuthGuard: JWT recovery failed',
-            'warn',
-            getAuthState(),
-            {
-              pathname,
-              reason: 'Recovery returned null',
-            }
-          );
         }
 
-        // Cannot recover - redirect to login
-        const reason = validation.reason || 'Authentication required';
+        // Build redirect URL with return URL
         const returnUrl = encodeURIComponent(pathname);
-        const loginUrl = `/login?returnUrl=${returnUrl}&reason=${encodeURIComponent(reason)}`;
+        const loginUrl = `/login?returnUrl=${returnUrl}`;
 
-        logRedirect(
+        console.log('[FormAuthGuard] Redirecting to login', {
           pathname,
           loginUrl,
           reason,
-          getAuthState(),
-          {
-            canRecover: validation.canRecover,
-            requiresJWT,
-          }
-        );
+        });
 
         // Call optional failure callback
         if (onAuthFailure) {
@@ -147,15 +121,10 @@ export function FormAuthGuard({
         // Handle unexpected errors
         const errorMsg = error instanceof Error ? error.message : 'Authentication validation failed';
         
-        logAuthEvent(
-          'FormAuthGuard: Validation error',
-          'error',
-          getAuthState(),
-          {
-            pathname,
-            error: errorMsg,
-          }
-        );
+        console.error('[FormAuthGuard] Validation error', {
+          pathname,
+          error: errorMsg,
+        });
 
         setErrorMessage(errorMsg);
         setAuthState('error');
@@ -167,13 +136,25 @@ export function FormAuthGuard({
 
         // Redirect to login on error
         const returnUrl = encodeURIComponent(pathname);
-        const loginUrl = `/login?returnUrl=${returnUrl}&reason=${encodeURIComponent(errorMsg)}`;
+        const loginUrl = `/login?returnUrl=${returnUrl}`;
         router.push(loginUrl);
       }
     }
 
     checkAuth();
-  }, [pathname, requiresJWT, onAuthFailure, router]);
+    
+    // Listen for storage events to sync across tabs
+    // Requirements: 7.5 (jwt-only-authentication)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        console.log('[FormAuthGuard] Token changed in another tab, re-checking auth');
+        checkAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [pathname, onAuthFailure, router]);
 
   // Loading state
   if (authState === 'loading') {

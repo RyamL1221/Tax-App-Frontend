@@ -40,7 +40,9 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
   /**
    * Check if user is already authenticated
    * If so, redirect to dashboard
-   * Requirements: 10.4
+   * 
+   * Also listen for storage events to sync authentication state across tabs
+   * Requirements: 10.4, 7.5 (jwt-only-authentication)
    */
   useEffect(() => {
     const checkAuth = async () => {
@@ -66,6 +68,18 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
     };
 
     checkAuth();
+    
+    // Listen for storage events to sync across tabs
+    // Requirements: 7.5 (jwt-only-authentication)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        console.log('[RegisterPageClient] Token changed in another tab, re-checking auth');
+        checkAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [router, callbackUrl]);
 
   /**

@@ -1,11 +1,19 @@
 /**
  * Session Management Utilities
  * 
+ * **IMPORTANT: These utilities are for SERVER-SIDE API routes only!**
+ * 
+ * Client-side components should use AuthCoordinator.getAuthState() for
+ * authentication checks, which uses JWT tokens as the single source of truth.
+ * 
+ * Session cookies are used exclusively for backend API authentication and
+ * should NOT be checked in client-side code for authentication decisions.
+ * 
  * Provides functions for:
- * - Creating session tokens
- * - Validating session tokens
- * - Managing session expiration
- * - Setting secure HTTP-only cookies
+ * - Creating session tokens (server-side only)
+ * - Validating session tokens (server-side only)
+ * - Managing session expiration (server-side only)
+ * - Setting secure HTTP-only cookies (server-side only)
  * 
  * Enhanced with comprehensive logging for debugging authentication issues.
  * 
@@ -15,6 +23,8 @@
  * - 8.4: Handle session expiration
  * - 2.1: Log session operations with success/failure status
  * - 2.6: Log validation results
+ * - 6.3 (jwt-only-authentication): Session utilities for API routes only
+ * - 6.4 (jwt-only-authentication): Not for client-side authentication decisions
  */
 
 import { cookies } from 'next/headers';

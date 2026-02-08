@@ -60,6 +60,9 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
   /**
    * Check if user is already authenticated
    * If so, redirect to dashboard (unless they have saved form data)
+   * 
+   * Also listen for storage events to sync authentication state across tabs
+   * Requirements: 7.5 (jwt-only-authentication)
    */
   React.useEffect(() => {
     const checkAuth = async () => {
@@ -99,6 +102,18 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
     };
 
     checkAuth();
+    
+    // Listen for storage events to sync across tabs
+    // Requirements: 7.5 (jwt-only-authentication)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        console.log('[LoginPageClient] Token changed in another tab, re-checking auth');
+        checkAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [router, callbackUrl]);
 
   /**
