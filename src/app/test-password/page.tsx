@@ -66,7 +66,7 @@ export default function TestPasswordPage() {
           <li>Type something in the password field</li>
           <li>Click the eye icon button</li>
           <li>Check the console for logs</li>
-          <li>Watch the "Debug Info" section update</li>
+          <li>Watch the Debug Info section update</li>
         </ol>
       </div>
     </div>

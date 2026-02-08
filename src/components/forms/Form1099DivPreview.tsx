@@ -5,7 +5,8 @@
  * 
  * Features:
  * - Displays job ID, status, and document type
- * - Provides download link for generated PDF
+ * - In-page PDF preview with authenticated fetch
+ * - Download button for generated PDF
  * - "Edit" button to return to form for modifications
  * - "Approve" button with success message and timeout
  * - Full accessibility support (ARIA labels, keyboard navigation)
@@ -19,6 +20,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { documentService } from '@/lib/api';
 
 /**
  * Document response structure from the backend API
@@ -65,6 +67,47 @@ export function Form1099DivPreview({
   className 
 }: Form1099DivPreviewProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  // Fetch PDF when component mounts or document changes
+  useEffect(() => {
+    let isMounted = true;
+    let currentBlobUrl: string | null = null;
+
+    const fetchPdf = async () => {
+      setPdfLoading(true);
+      setPdfError(null);
+
+      try {
+        const blobUrl = await documentService.downloadDocument(document.outputKey);
+        
+        if (isMounted) {
+          currentBlobUrl = blobUrl;
+          setPdfUrl(blobUrl);
+          setPdfLoading(false);
+        }
+      } catch (error: any) {
+        console.error('[Form1099DivPreview] Error fetching PDF:', error);
+        
+        if (isMounted) {
+          setPdfError(error.message || 'Failed to load PDF');
+          setPdfLoading(false);
+        }
+      }
+    };
+
+    fetchPdf();
+
+    // Cleanup: revoke blob URL when component unmounts or document changes
+    return () => {
+      isMounted = false;
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+      }
+    };
+  }, [document.outputKey]);
 
   // Handle approve button click
   const handleApprove = () => {
@@ -125,9 +168,6 @@ export function Form1099DivPreview({
     );
   }
 
-  // Generate download URL for the PDF
-  const downloadUrl = getDocumentDownloadUrl(document.outputKey);
-
   return (
     <div className={cn('space-y-6', className)}>
       {/* Header */}
@@ -136,7 +176,7 @@ export function Form1099DivPreview({
           Preview Generated Document
         </h2>
         <p className="text-sm text-gray-600 mt-1">
-          Review your document information and download the PDF
+          Review your document and download the PDF
         </p>
       </div>
 
@@ -173,43 +213,43 @@ export function Form1099DivPreview({
             </dd>
           </div>
         </div>
+      </div>
 
-        {/* Download Section */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <svg
-                className="w-8 h-8 text-red-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Form 1099-DIV PDF
-                </p>
-                <p className="text-xs text-gray-500">
-                  Ready to download
-                </p>
-              </div>
+      {/* PDF Preview Section */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <svg
+              className="w-8 h-8 text-red-600"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+            >
+              <path
+                fillRule="evenodd"
+                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                Form 1099-DIV PDF
+              </p>
+              <p className="text-xs text-gray-500">
+                {pdfLoading ? 'Loading...' : pdfError ? 'Error loading PDF' : 'Ready to view'}
+              </p>
             </div>
+          </div>
+          {pdfUrl && (
             <a
-              href={downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={pdfUrl}
+              download={`1099-DIV-${document.jobId}.pdf`}
               className={cn(
                 'inline-flex items-center px-4 py-2 rounded-md',
                 'text-sm font-medium text-blue-600 bg-blue-50',
                 'hover:bg-blue-100 active:bg-blue-200',
                 'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
                 'transition-colors duration-200',
-                // Mobile-friendly touch target
                 'min-h-[44px]'
               )}
               aria-label="Download PDF document"
@@ -228,9 +268,61 @@ export function Form1099DivPreview({
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Download PDF
+              Download
             </a>
-          </div>
+          )}
+        </div>
+
+        {/* PDF Viewer */}
+        <div className="relative bg-gray-100" style={{ minHeight: '600px' }}>
+          {pdfLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-sm text-gray-600">Loading PDF...</p>
+              </div>
+            </div>
+          )}
+
+          {pdfError && (
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+                <div className="flex items-start">
+                  <svg
+                    className="w-6 h-6 text-red-600 mr-3 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800 mb-1">
+                      Failed to Load PDF
+                    </h3>
+                    <p className="text-sm text-red-700">
+                      {pdfError}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {pdfUrl && !pdfLoading && !pdfError && (
+            <iframe
+              src={pdfUrl}
+              className="w-full border-0"
+              style={{ height: '600px' }}
+              title="1099-DIV Form Preview"
+              aria-label="PDF preview of generated 1099-DIV form"
+            />
+          )}
         </div>
       </div>
 
@@ -302,9 +394,10 @@ export function Form1099DivPreview({
           <div className="text-sm text-blue-800">
             <p className="font-medium mb-1">Next Steps</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Download the PDF to review all form details</li>
-              <li>Click "Edit Form" if you need to make changes</li>
-              <li>Click "Approve" to finalize your submission</li>
+              <li>Review the PDF preview above</li>
+              <li>Click &quot;Download&quot; to save a copy to your device</li>
+              <li>Click &quot;Edit Form&quot; if you need to make changes</li>
+              <li>Click &quot;Approve&quot; to finalize your submission</li>
             </ul>
           </div>
         </div>
@@ -361,20 +454,4 @@ function StatusBadge({ status }: StatusBadgeProps) {
       {config.label}
     </span>
   );
-}
-
-/**
- * Generates a download URL for the document
- * 
- * In production, this would construct a URL to download from S3 or CDN.
- * For now, we'll use the outputKey as a placeholder.
- * 
- * @param outputKey - The S3 key for the generated document
- * @returns Download URL for the document
- */
-function getDocumentDownloadUrl(outputKey: string): string {
-  // TODO: Replace with actual S3/CDN URL construction
-  // For now, return a placeholder that includes the outputKey
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  return `${baseUrl}/documents/download/${encodeURIComponent(outputKey)}`;
 }

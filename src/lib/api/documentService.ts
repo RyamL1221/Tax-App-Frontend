@@ -46,6 +46,9 @@ export class DocumentService {
    * - Monetary values must have exactly 2 decimal places
    * - Calendar year must be a 4-digit number between 1900 and 2100
    * 
+   * Note: Backend expects monetary values as numbers (floats), not strings.
+   * This method converts string monetary values to numbers before sending.
+   * 
    * @param request - Document generation request with documentType and formData
    * @returns Promise resolving to GenerateDocumentResponse with job information
    * @throws ApiError if validation fails or API request fails
@@ -60,12 +63,16 @@ export class DocumentService {
       this.validate1099DivData(formData);
     }
 
+    // Convert monetary string values to numbers for backend compatibility
+    // Backend expects numbers despite documentation stating strings
+    const transformedFormData = this.transformMonetaryValues(formData);
+
     // Make API request (requires authentication)
     return this.apiClient.post<GenerateDocumentResponse>(
       '/documents/generate',
       {
         documentType,
-        formData
+        formData: transformedFormData
       }
     );
   }
@@ -172,10 +179,10 @@ export class DocumentService {
     // Validate optional monetary values
     const optionalMonetaryFields: (keyof Form1099DivData)[] = [
       'qualifiedDividends',
-      'totalCapitalGain',
-      'unrecaptured1250Gain',
+      'totalCapitalGainDistributions',
+      'unrecapturedSection1250Gain',
       'section1202Gain',
-      'collectiblesGain',
+      'collectibles28Gain',
       'section897OrdinaryDividends',
       'section897CapitalGain',
       'nondividendDistributions',
@@ -186,7 +193,7 @@ export class DocumentService {
       'cashLiquidationDistributions',
       'noncashLiquidationDistributions',
       'exemptInterestDividends',
-      'specifiedPABInterestDividends',
+      'specifiedPrivateActivityBondInterest',
       'stateTaxWithheld'
     ];
 
@@ -201,6 +208,141 @@ export class DocumentService {
           };
         }
       }
+    }
+  }
+
+  /**
+   * Transforms monetary string values to numbers for backend compatibility
+   * 
+   * The backend expects monetary values as numbers (floats), not strings,
+   * despite the API documentation stating they should be strings.
+   * This method converts all monetary string fields to numbers.
+   * 
+   * @param formData - The 1099-DIV form data with string monetary values
+   * @returns Form data with monetary values converted to numbers
+   * 
+   * Requirements: Backend compatibility
+   */
+  private transformMonetaryValues(formData: Form1099DivData): any {
+    // Create a copy to avoid mutating the original
+    const transformed: any = { ...formData };
+
+    // List of all monetary fields that need conversion
+    const monetaryFields = [
+      'totalOrdinaryDividends',
+      'qualifiedDividends',
+      'totalCapitalGainDistributions',
+      'unrecapturedSection1250Gain',
+      'section1202Gain',
+      'collectibles28Gain',
+      'section897OrdinaryDividends',
+      'section897CapitalGain',
+      'nondividendDistributions',
+      'federalIncomeTaxWithheld',
+      'section199ADividends',
+      'investmentExpenses',
+      'foreignTaxPaid',
+      'cashLiquidationDistributions',
+      'noncashLiquidationDistributions',
+      'exemptInterestDividends',
+      'specifiedPrivateActivityBondInterest',
+      'stateTaxWithheld',
+      'stateTaxWithheld2'  // Second state tax field
+    ];
+
+    // Convert each monetary field from string to number
+    // Remove empty strings to prevent backend validation errors
+    for (const field of monetaryFields) {
+      const value = transformed[field];
+      if (value === '' || value === null) {
+        // Remove empty/null values - backend doesn't accept them
+        delete transformed[field];
+      } else if (value !== undefined) {
+        // Convert string to number (parseFloat handles decimal values)
+        transformed[field] = parseFloat(value);
+      }
+    }
+
+    return transformed;
+  }
+
+  /**
+   * Downloads a generated PDF document with authentication
+   * 
+   * Fetches the PDF from the backend using the outputKey and JWT token.
+   * Uses a Next.js API proxy route to bypass CORS issues.
+   * Returns a blob URL that can be used to display the PDF in an iframe
+   * or trigger a download.
+   * 
+   * @param outputKey - The S3 key for the generated document
+   * @returns Promise resolving to a blob URL for the PDF
+   * @throws ApiError if the request fails
+   * 
+   * Requirements: 5.1, 5.2
+   */
+  async downloadDocument(outputKey: string): Promise<string> {
+    // Use Next.js API proxy route to bypass CORS issues
+    // The proxy route forwards the request to the backend with authentication
+    const downloadUrl = `/api/proxy/download/${encodeURIComponent(outputKey)}`;
+
+    // Get the JWT token from storage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+
+    // Check if token exists
+    if (!token) {
+      throw {
+        status: 401,
+        message: 'Authentication required. Please log in again.'
+      };
+    }
+
+    try {
+      // Fetch the PDF with authentication via proxy
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/pdf'
+        }
+      });
+
+      // Handle errors
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to download document';
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorJson.message || errorMessage;
+        } catch {
+          // If not JSON, use the text as message
+          errorMessage = errorText || errorMessage;
+        }
+
+        throw {
+          status: response.status,
+          message: errorMessage
+        };
+      }
+
+      // Convert response to blob
+      const blob = await response.blob();
+      
+      // Create a blob URL
+      const blobUrl = URL.createObjectURL(blob);
+      
+      return blobUrl;
+    } catch (error: any) {
+      // Handle network errors
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        throw {
+          status: 0,
+          message: 'Unable to download PDF. Please check your network connection and try again.'
+        };
+      }
+      
+      // Re-throw other errors
+      throw error;
     }
   }
 }

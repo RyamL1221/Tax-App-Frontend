@@ -90,10 +90,10 @@ export interface Form1099DivData {
   
   // Optional dividend fields
   qualifiedDividends?: string;
-  totalCapitalGain?: string;
-  unrecaptured1250Gain?: string;
+  totalCapitalGainDistributions?: string;
+  unrecapturedSection1250Gain?: string;
   section1202Gain?: string;
-  collectiblesGain?: string;
+  collectibles28Gain?: string;
   section897OrdinaryDividends?: string;
   section897CapitalGain?: string;
   nondividendDistributions?: string;
@@ -109,7 +109,7 @@ export interface Form1099DivData {
   cashLiquidationDistributions?: string;
   noncashLiquidationDistributions?: string;
   exemptInterestDividends?: string;
-  specifiedPABInterestDividends?: string;
+  specifiedPrivateActivityBondInterest?: string;
   
   // Optional state tax fields
   stateTaxWithheld?: string;

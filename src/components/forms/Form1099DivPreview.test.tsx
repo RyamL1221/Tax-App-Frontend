@@ -13,6 +13,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form1099DivPreview, DocumentResponse } from './Form1099DivPreview';
 
+// Mock the documentService
+jest.mock('@/lib/api', () => ({
+  documentService: {
+    downloadDocument: jest.fn()
+  }
+}));
+
+import { documentService } from '@/lib/api';
+
 // Mock document response
 const mockDocument: DocumentResponse = {
   jobId: 'job-12345',
@@ -22,9 +31,24 @@ const mockDocument: DocumentResponse = {
   outputKey: 'outputs/1099-DIV-job-12345.pdf'
 };
 
+// Mock blob URL
+const mockBlobUrl = 'blob:http://localhost:3000/mock-pdf-url';
+
 describe('Form1099DivPreview', () => {
+  beforeEach(() => {
+    // Reset mocks before each test
+    jest.clearAllMocks();
+    
+    // Mock successful PDF download by default
+    (documentService.downloadDocument as jest.Mock).mockResolvedValue(mockBlobUrl);
+    
+    // Mock URL.createObjectURL and URL.revokeObjectURL
+    global.URL.createObjectURL = jest.fn(() => mockBlobUrl);
+    global.URL.revokeObjectURL = jest.fn();
+  });
+
   describe('Document Information Display', () => {
-    it('should display job ID', () => {
+    it('should display job ID', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -37,7 +61,7 @@ describe('Form1099DivPreview', () => {
       expect(screen.getByText('job-12345')).toBeInTheDocument();
     });
 
-    it('should display status', () => {
+    it('should display status', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -50,7 +74,7 @@ describe('Form1099DivPreview', () => {
       expect(screen.getByRole('status', { name: /Status: Completed/i })).toBeInTheDocument();
     });
 
-    it('should display document type', () => {
+    it('should display document type', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -63,7 +87,7 @@ describe('Form1099DivPreview', () => {
       expect(screen.getByText('1099-DIV')).toBeInTheDocument();
     });
 
-    it('should display all required information (Requirement 5.1, 5.2, 5.3)', () => {
+    it('should display all required information (Requirement 5.1, 5.2, 5.3)', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -81,8 +105,8 @@ describe('Form1099DivPreview', () => {
     });
   });
 
-  describe('Download Link', () => {
-    it('should provide a download link (Requirement 5.3)', () => {
+  describe('PDF Preview and Download', () => {
+    it('should fetch and display PDF preview (Requirement 5.3)', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -91,14 +115,23 @@ describe('Form1099DivPreview', () => {
         />
       );
 
-      const downloadLink = screen.getByRole('link', { name: /Download PDF/i });
-      expect(downloadLink).toBeInTheDocument();
-      expect(downloadLink).toHaveAttribute('href');
-      expect(downloadLink).toHaveAttribute('target', '_blank');
-      expect(downloadLink).toHaveAttribute('rel', 'noopener noreferrer');
+      // Should show loading state initially
+      expect(screen.getByText('Loading PDF...')).toBeInTheDocument();
+
+      // Wait for PDF to load
+      await waitFor(() => {
+        expect(documentService.downloadDocument).toHaveBeenCalledWith(mockDocument.outputKey);
+      });
+
+      // Should display iframe with PDF
+      await waitFor(() => {
+        const iframe = screen.getByTitle('1099-DIV Form Preview');
+        expect(iframe).toBeInTheDocument();
+        expect(iframe).toHaveAttribute('src', mockBlobUrl);
+      });
     });
 
-    it('should include outputKey in download URL', () => {
+    it('should provide a download link after PDF loads (Requirement 5.3)', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -107,14 +140,58 @@ describe('Form1099DivPreview', () => {
         />
       );
 
-      const downloadLink = screen.getByRole('link', { name: /Download PDF/i });
-      const href = downloadLink.getAttribute('href');
-      expect(href).toContain(encodeURIComponent(mockDocument.outputKey));
+      // Wait for PDF to load
+      await waitFor(() => {
+        const downloadLink = screen.getByRole('link', { name: /Download PDF/i });
+        expect(downloadLink).toBeInTheDocument();
+        expect(downloadLink).toHaveAttribute('href', mockBlobUrl);
+        expect(downloadLink).toHaveAttribute('download', `1099-DIV-${mockDocument.jobId}.pdf`);
+      });
+    });
+
+    it('should handle PDF loading errors', async () => {
+      const errorMessage = 'Failed to load PDF';
+      (documentService.downloadDocument as jest.Mock).mockRejectedValue(new Error(errorMessage));
+
+      render(
+        <Form1099DivPreview
+          document={mockDocument}
+          onEdit={jest.fn()}
+          onApprove={jest.fn()}
+        />
+      );
+
+      // Wait for error to appear
+      await waitFor(() => {
+        expect(screen.getByText('Failed to Load PDF')).toBeInTheDocument();
+        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+      });
+    });
+
+    it('should cleanup blob URL on unmount', async () => {
+      const { unmount } = render(
+        <Form1099DivPreview
+          document={mockDocument}
+          onEdit={jest.fn()}
+          onApprove={jest.fn()}
+        />
+      );
+
+      // Wait for PDF to load
+      await waitFor(() => {
+        expect(documentService.downloadDocument).toHaveBeenCalled();
+      });
+
+      // Unmount component
+      unmount();
+
+      // Should revoke blob URL
+      expect(global.URL.revokeObjectURL).toHaveBeenCalledWith(mockBlobUrl);
     });
   });
 
   describe('Action Buttons', () => {
-    it('should display Edit and Approve buttons (Requirement 5.4)', () => {
+    it('should display Edit and Approve buttons (Requirement 5.4)', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -195,7 +272,7 @@ describe('Form1099DivPreview', () => {
   });
 
   describe('Status Badge', () => {
-    it('should display COMPLETED status with green badge', () => {
+    it('should display COMPLETED status with green badge', async () => {
       render(
         <Form1099DivPreview
           document={{ ...mockDocument, status: 'COMPLETED' }}
@@ -208,7 +285,7 @@ describe('Form1099DivPreview', () => {
       expect(statusBadge).toHaveClass('bg-green-100', 'text-green-800');
     });
 
-    it('should display PENDING status with yellow badge', () => {
+    it('should display PENDING status with yellow badge', async () => {
       render(
         <Form1099DivPreview
           document={{ ...mockDocument, status: 'PENDING' }}
@@ -221,7 +298,7 @@ describe('Form1099DivPreview', () => {
       expect(statusBadge).toHaveClass('bg-yellow-100', 'text-yellow-800');
     });
 
-    it('should display RUNNING status with blue badge', () => {
+    it('should display RUNNING status with blue badge', async () => {
       render(
         <Form1099DivPreview
           document={{ ...mockDocument, status: 'RUNNING' }}
@@ -234,7 +311,7 @@ describe('Form1099DivPreview', () => {
       expect(statusBadge).toHaveClass('bg-blue-100', 'text-blue-800');
     });
 
-    it('should display FAILED status with red badge', () => {
+    it('should display FAILED status with red badge', async () => {
       render(
         <Form1099DivPreview
           document={{ ...mockDocument, status: 'FAILED' }}
@@ -247,7 +324,7 @@ describe('Form1099DivPreview', () => {
       expect(statusBadge).toHaveClass('bg-red-100', 'text-red-800');
     });
 
-    it('should handle unknown status gracefully', () => {
+    it('should handle unknown status gracefully', async () => {
       render(
         <Form1099DivPreview
           document={{ ...mockDocument, status: 'UNKNOWN' }}
@@ -320,7 +397,7 @@ describe('Form1099DivPreview', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels for buttons', () => {
+    it('should have proper ARIA labels for buttons', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -331,7 +408,11 @@ describe('Form1099DivPreview', () => {
 
       expect(screen.getByRole('button', { name: /Edit form data/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Approve and finalize form/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /Download PDF document/i })).toBeInTheDocument();
+      
+      // Wait for PDF to load before checking download link
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /Download PDF document/i })).toBeInTheDocument();
+      });
     });
 
     it('should have proper ARIA live region for success message', async () => {
@@ -365,6 +446,11 @@ describe('Form1099DivPreview', () => {
         />
       );
 
+      // Wait for PDF to load
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /Download PDF/i })).toBeInTheDocument();
+      });
+
       // Tab to download link
       await user.tab();
       expect(screen.getByRole('link', { name: /Download PDF/i })).toHaveFocus();
@@ -390,7 +476,7 @@ describe('Form1099DivPreview', () => {
   });
 
   describe('Responsive Design', () => {
-    it('should apply responsive classes for mobile and desktop', () => {
+    it('should apply responsive classes for mobile and desktop', async () => {
       const { container } = render(
         <Form1099DivPreview
           document={mockDocument}
@@ -408,7 +494,7 @@ describe('Form1099DivPreview', () => {
       expect(infoItems.length).toBeGreaterThan(0);
     });
 
-    it('should have mobile-friendly touch targets', () => {
+    it('should have mobile-friendly touch targets', async () => {
       render(
         <Form1099DivPreview
           document={mockDocument}
@@ -417,8 +503,11 @@ describe('Form1099DivPreview', () => {
         />
       );
 
-      const downloadLink = screen.getByRole('link', { name: /Download PDF/i });
-      expect(downloadLink).toHaveClass('min-h-[44px]');
+      // Wait for PDF to load
+      await waitFor(() => {
+        const downloadLink = screen.getByRole('link', { name: /Download PDF/i });
+        expect(downloadLink).toHaveClass('min-h-[44px]');
+      });
     });
   });
 

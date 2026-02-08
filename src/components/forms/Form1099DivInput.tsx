@@ -82,11 +82,85 @@ export function Form1099DivInput({
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    reset,
   } = useForm<Form1099DivData>({
     resolver: zodResolver(form1099DivSchema),
     defaultValues: defaultValues || getDefaultFormValues(),
     mode: 'onBlur', // Validate on blur for better UX
   });
+
+  // Sample data for testing
+  const fillSampleData = () => {
+    const sampleData: Form1099DivData = {
+      // Required fields
+      calendarYear: '2024',
+      payerName: 'Example Investment Corporation',
+      payerTIN: '12-3456789',
+      recipientName: 'John Doe',
+      recipientTIN: '123-45-6789',
+      totalOrdinaryDividends: '1000.00',
+      
+      // Payer address fields
+      payerStreetAddress: '123 Wall Street',
+      payerCity: 'New York',
+      payerState: 'NY',
+      payerCountry: 'USA',
+      payerZip: '10005',
+      payerTelephoneNumber: '(555) 123-4567',
+      
+      // Recipient address fields
+      recipientStreetAddress: '456 Oak Avenue',
+      recipientCity: 'Los Angeles',
+      recipientState: 'CA',
+      recipientCountry: 'USA',
+      recipientZip: '90001',
+      
+      // Dividend fields
+      qualifiedDividends: '800.00',
+      totalCapitalGainDistributions: '500.00',
+      unrecapturedSection1250Gain: '50.00',
+      section1202Gain: '75.00',
+      collectibles28Gain: '25.00',
+      section897OrdinaryDividends: '10.00',
+      section897CapitalGain: '15.00',
+      
+      // Distribution fields
+      nondividendDistributions: '30.00',
+      cashLiquidationDistributions: '500.00',
+      noncashLiquidationDistributions: '300.00',
+      
+      // Tax withholding fields
+      federalIncomeTaxWithheld: '150.00',
+      foreignTaxPaid: '75.00',
+      foreignCountry: 'United Kingdom',
+      
+      // Other fields
+      section199ADividends: '300.00',
+      investmentExpenses: '20.00',
+      exemptInterestDividends: '60.00',
+      specifiedPrivateActivityBondInterest: '35.00',
+      
+      // State tax fields (first state)
+      state: 'NY',
+      stateIdentificationNumber: '12-3456789',
+      stateTaxWithheld: '50.00',
+      
+      // State tax fields (second state)
+      state2: 'CA',
+      stateIdentificationNumber2: '98-7654321',
+      stateTaxWithheld2: '25.00',
+      
+      // Account number
+      accountNumber: '1234567890',
+      
+      // Checkbox fields
+      voided: false,
+      corrected: false,
+      secondTinNotification: false,
+      fatcaFilingRequirement: false,
+    };
+    reset(sampleData);
+  };
 
   // Handle form submission
   const onFormSubmit = handleSubmit(async (data) => {
@@ -161,6 +235,34 @@ export function Form1099DivInput({
           </div>
         </div>
       )}
+
+      {/* Development Helper - Fill Sample Data Button */}
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={fillSampleData}
+          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+          aria-label="Fill form with sample data for testing"
+        >
+          <svg
+            className="w-4 h-4 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          Fill Sample Data
+        </Button>
+      </div>
 
       {/* Calendar Year Section */}
       <FormSection title="Calendar Year">
