@@ -1,21 +1,20 @@
-import { getSession } from '@/lib/session';
 import NavbarClient from './NavbarClient';
 
 /**
- * Navbar server component that integrates with the session management system
+ * Navbar server component wrapper
  * 
- * This server component handles authentication state checking on the server side
- * and passes the session data to the client component for rendering. This approach
- * ensures secure session validation while maintaining optimal performance.
+ * This server component simply renders the NavbarClient component.
+ * All authentication logic is handled on the client side using AuthCoordinator,
+ * which checks for JWT token presence in localStorage.
  * 
  * Features:
- * - Server-side session checking using getSession()
- * - Error handling for session retrieval failures
- * - Treats errors as unauthenticated state for graceful degradation
- * - Passes session data to NavbarClient for rendering
+ * - Minimal server component wrapper
+ * - Delegates all authentication logic to client component
+ * - No session prop passing needed
  * 
  * Requirements:
- * - 4.3: Query the Authentication_System to determine the current Session state
+ * - 1.1: Use AuthCoordinator to determine authentication state
+ * - 5.1: Use client-side rendering for authentication-dependent UI
  * 
  * @example
  * ```tsx
@@ -32,17 +31,6 @@ import NavbarClient from './NavbarClient';
  * }
  * ```
  */
-export default async function Navbar() {
-  let session = null;
-
-  try {
-    // Attempt to retrieve the current session
-    session = await getSession();
-  } catch (error) {
-    // Log error for debugging but treat as unauthenticated state
-    console.error('Failed to retrieve session:', error);
-    // session remains null, will render unauthenticated state
-  }
-
-  return <NavbarClient session={session} />;
+export default function Navbar() {
+  return <NavbarClient />;
 }
