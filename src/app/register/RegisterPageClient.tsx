@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RegistrationForm } from '@/components/RegistrationForm';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { getAuthState } from '@/lib/auth/AuthCoordinator';
 
 export interface RegisterPageClientProps {
   /**
@@ -22,20 +23,50 @@ export interface RegisterPageClientProps {
  * - Responsive design (mobile and desktop)
  * - Error boundary for error handling
  * - Success redirect handling
- * 
- * Note: Authentication checking is handled by the server component (page.tsx)
- * which redirects authenticated users before this component renders.
+ * - Authentication state checking (redirects if already logged in)
  * 
  * Requirements:
  * - 6.3: Redirect user after successful registration
  * - 10.2: Redirect to dashboard after successful registration
- * - 10.4: Redirect authenticated users to dashboard (handled by server component)
+ * - 10.4: Redirect authenticated users to dashboard
  * 
  * @param props - Component props
  * @returns Register page UI
  */
 export default function RegisterPageClient({ callbackUrl }: RegisterPageClientProps) {
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  /**
+   * Check if user is already authenticated
+   * If so, redirect to dashboard
+   * Requirements: 10.4
+   */
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const authState = await getAuthState();
+        console.log('[RegisterPageClient] Auth state:', authState);
+        
+        // If user has JWT token, redirect to dashboard
+        if (authState.hasJWT) {
+          console.log('[RegisterPageClient] User already authenticated, redirecting to dashboard');
+          const targetUrl = callbackUrl || '/dashboard';
+          router.push(targetUrl);
+          return;
+        }
+        
+        // User not authenticated, show register form
+        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error('[RegisterPageClient] Error checking auth state:', error);
+        // On error, assume not authenticated and show register form
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router, callbackUrl]);
 
   /**
    * Handle successful registration
@@ -45,6 +76,15 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
     const targetUrl = callbackUrl || '/dashboard';
     router.push(targetUrl);
   };
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>

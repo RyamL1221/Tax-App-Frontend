@@ -1,40 +1,29 @@
-import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import RegisterPageClient from './RegisterPageClient';
 
 /**
  * Server Component: Register Page
  * 
  * This is the main registration page route that handles:
- * - Session checking on the server
- * - Redirecting authenticated users
  * - Rendering the client-side registration form
+ * - Authentication checking is handled on the client side
+ * 
+ * Note: Authentication state checking and redirects are now handled
+ * by the client component using AuthCoordinator to check for JWT tokens.
+ * This ensures consistency with the navbar and other client-side auth checks.
  * 
  * Requirements:
  * - 10.3: Register page accessible at /register route
- * - 10.4: Redirect authenticated users to dashboard
+ * - 10.4: Redirect authenticated users to dashboard (handled by client)
  * 
- * @returns Register page or redirects to dashboard if authenticated
+ * @returns Register page
  */
-export default async function RegisterPage({
+export default function RegisterPage({
   searchParams,
 }: {
   searchParams: { callbackUrl?: string };
 }) {
-  // Check for existing session token
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get('session_token');
-
-  // If user has a valid session, redirect to authenticated area
-  // Requirement 10.4: Valid session triggers redirect
-  if (sessionToken?.value) {
-    // TODO: Validate session token with authentication service
-    // For now, we redirect if a session token exists
-    const redirectUrl = searchParams.callbackUrl || '/dashboard';
-    redirect(redirectUrl);
-  }
-
   // Render the client-side register page
+  // Authentication checking and redirect logic is handled by the client component
   return <RegisterPageClient callbackUrl={searchParams.callbackUrl} />;
 }
 

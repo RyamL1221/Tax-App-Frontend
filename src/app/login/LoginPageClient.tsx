@@ -13,6 +13,7 @@ import {
   clearFormData 
 } from '@/lib/auth/FormDataPreserver';
 import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
+import { getAuthState } from '@/lib/auth/AuthCoordinator';
 
 export interface LoginPageClientProps {
   /**
@@ -35,6 +36,7 @@ export interface LoginPageClientProps {
  * - Error boundary for error handling
  * - Success redirect handling
  * - Form data restoration after re-authentication
+ * - Authentication state checking (redirects if already logged in)
  * 
  * Requirements:
  * - 1.2: Redirect user after successful authentication
@@ -49,28 +51,55 @@ export interface LoginPageClientProps {
 export default function LoginPageClient({ callbackUrl, expired }: LoginPageClientProps) {
   const router = useRouter();
   const [showExpiredMessage, setShowExpiredMessage] = React.useState(expired || false);
+  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
   const [savedFormInfo, setSavedFormInfo] = React.useState<{
     formType: string;
     returnUrl: string;
   } | null>(null);
 
   /**
-   * Check for saved form data on mount
-   * Requirement 8.4: Display notification if form data exists
+   * Check if user is already authenticated
+   * If so, redirect to dashboard (unless they have saved form data)
    */
   React.useEffect(() => {
-    // Check for saved form data for 1099-DIV form
-    const formType = '1099-DIV';
-    if (hasSavedFormData(formType)) {
-      const metadata = getFormDataMetadata(formType);
-      if (metadata) {
-        setSavedFormInfo({
-          formType: metadata.formType,
-          returnUrl: metadata.returnUrl || '/forms/1099-div',
-        });
+    const checkAuth = async () => {
+      try {
+        const authState = await getAuthState();
+        console.log('[LoginPageClient] Auth state:', authState);
+        
+        // Check for saved form data first
+        const formType = '1099-DIV';
+        const hasSavedData = hasSavedFormData(formType);
+        
+        if (hasSavedData) {
+          const metadata = getFormDataMetadata(formType);
+          if (metadata) {
+            setSavedFormInfo({
+              formType: metadata.formType,
+              returnUrl: metadata.returnUrl || '/forms/1099-div',
+            });
+          }
+        }
+        
+        // If user has JWT token and no saved form data, redirect to dashboard
+        if (authState.hasJWT && !hasSavedData) {
+          console.log('[LoginPageClient] User already authenticated, redirecting to dashboard');
+          const targetUrl = callbackUrl || '/dashboard';
+          router.push(targetUrl);
+          return;
+        }
+        
+        // User not authenticated or has saved form data, show login form
+        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error('[LoginPageClient] Error checking auth state:', error);
+        // On error, assume not authenticated and show login form
+        setIsCheckingAuth(false);
       }
-    }
-  }, []);
+    };
+
+    checkAuth();
+  }, [router, callbackUrl]);
 
   /**
    * Clear logout state on mount
@@ -140,6 +169,15 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
     // This callback is provided for potential future logging or analytics
     console.error('Login error:', error);
   };
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>
