@@ -12,6 +12,7 @@ import {
   restoreFormData, 
   clearFormData 
 } from '@/lib/auth/FormDataPreserver';
+import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
 export interface LoginPageClientProps {
   /**
@@ -69,6 +70,19 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
         });
       }
     }
+  }, []);
+
+  /**
+   * Clear logout state on mount
+   * 
+   * This ensures the logout state is reset after the logout redirect completes.
+   * The logout state is set during the logout process to prevent race conditions
+   * where components attempt to access authentication state after tokens are cleared.
+   * 
+   * Requirements: 2.4, 4.3
+   */
+  React.useEffect(() => {
+    logoutStateManager.clearLogoutState();
   }, []);
 
   /**

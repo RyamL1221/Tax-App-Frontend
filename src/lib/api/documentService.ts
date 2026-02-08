@@ -269,21 +269,32 @@ export class DocumentService {
   /**
    * Downloads a generated PDF document with authentication
    * 
-   * Fetches the PDF from the backend using the outputKey and JWT token.
+   * Fetches the PDF from the backend using the jobId and JWT token.
    * Uses a Next.js API proxy route to bypass CORS issues.
    * Returns a blob URL that can be used to display the PDF in an iframe
    * or trigger a download.
    * 
-   * @param outputKey - The S3 key for the generated document
+   * Timeout Behavior:
+   * - Client timeout: 35 seconds
+   * - Proxy timeout: 30 seconds
+   * - If the backend takes longer than 30 seconds, the proxy returns 504
+   * - If the entire request takes longer than 35 seconds, client aborts with 504
+   * 
+   * Error Handling:
+   * - 401: Missing or invalid authentication token
+   * - 504: Request timeout (backend or network took too long)
+   * - Other status codes: Forwarded from backend/proxy
+   * 
+   * @param jobId - The job ID for the generated document (UUID)
    * @returns Promise resolving to a blob URL for the PDF
    * @throws ApiError if the request fails
    * 
    * Requirements: 5.1, 5.2
    */
-  async downloadDocument(outputKey: string): Promise<string> {
+  async downloadDocument(jobId: string): Promise<string> {
     // Use Next.js API proxy route to bypass CORS issues
     // The proxy route forwards the request to the backend with authentication
-    const downloadUrl = `/api/proxy/download/${encodeURIComponent(outputKey)}`;
+    const downloadUrl = `/api/proxy/download/${jobId}`;
 
     // Get the JWT token from storage
     const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
@@ -297,41 +308,61 @@ export class DocumentService {
     }
 
     try {
-      // Fetch the PDF with authentication via proxy
-      const response = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/pdf'
-        }
-      });
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 second timeout (slightly longer than proxy)
 
-      // Handle errors
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Failed to download document';
+      try {
+        // Fetch the PDF with authentication via proxy
+        const response = await fetch(downloadUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/pdf'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        // Handle errors
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to download document';
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorJson.message || errorMessage;
+          } catch {
+            // If not JSON, use the text as message
+            errorMessage = errorText || errorMessage;
+          }
+
+          throw {
+            status: response.status,
+            message: errorMessage
+          };
+        }
+
+        // Convert response to blob
+        const blob = await response.blob();
         
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || errorJson.message || errorMessage;
-        } catch {
-          // If not JSON, use the text as message
-          errorMessage = errorText || errorMessage;
+        // Create a blob URL
+        const blobUrl = URL.createObjectURL(blob);
+        
+        return blobUrl;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          throw {
+            status: 504,
+            message: 'Request timeout. The PDF download took too long. Please try again.'
+          };
         }
-
-        throw {
-          status: response.status,
-          message: errorMessage
-        };
+        
+        throw fetchError;
       }
-
-      // Convert response to blob
-      const blob = await response.blob();
-      
-      // Create a blob URL
-      const blobUrl = URL.createObjectURL(blob);
-      
-      return blobUrl;
     } catch (error: any) {
       // Handle network errors
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {

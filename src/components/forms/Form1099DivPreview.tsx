@@ -81,7 +81,7 @@ export function Form1099DivPreview({
       setPdfError(null);
 
       try {
-        const blobUrl = await documentService.downloadDocument(document.outputKey);
+        const blobUrl = await documentService.downloadDocument(document.jobId);
         
         if (isMounted) {
           currentBlobUrl = blobUrl;

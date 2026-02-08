@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { authService } from '@/lib/api';
+import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
 /**
  * Props for the LogoutButton component
@@ -55,16 +56,23 @@ export function LogoutButton({ className }: LogoutButtonProps): JSX.Element {
   /**
    * Handle logout process
    * 
-   * Clears JWT token from localStorage and redirects to login page.
+   * Sets logout state, clears JWT token from localStorage, and redirects to login page.
    * This is a synchronous, client-side only operation with no API calls.
    * 
    * Requirements:
+   * - 2.1: Sets logout state before any auth operations
+   * - 2.5: Ensures state is set before token clearing
    * - 4.1: Calls authService.logout() to clear token
    * - 4.2: Redirects to /login immediately
    * - 4.3: No API calls made
    * - 4.5: Token completely removed from localStorage
    */
   const handleLogout = () => {
+    // Set logout state FIRST, before any other operations
+    // This prevents race conditions where components try to access auth state
+    // after tokens are cleared but before redirect completes
+    logoutStateManager.setLogoutInProgress();
+    
     authService.logout();
     router.push('/login');
   };

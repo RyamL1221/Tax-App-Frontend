@@ -15,7 +15,6 @@
 import { ApiClient } from './apiClient';
 import { TokenManager } from './tokenManager';
 import { Validators } from './validators';
-import { setAuth } from '../auth/AuthCoordinator';
 import { jwtDecode } from 'jwt-decode';
 import {
   RegisterRequest,
@@ -119,8 +118,7 @@ export class AuthService {
    * Log in an existing user
    * 
    * Validates email format and password length before making the API call.
-   * On success, stores the returned JWT token via AuthCoordinator to ensure
-   * both session and JWT are synchronized.
+   * On success, stores the returned JWT token and verifies storage before returning.
    * Provides status updates via optional callback for UI feedback.
    * 
    * Handles both actual backend response format {message, email, token} and
@@ -128,15 +126,19 @@ export class AuthService {
    * 
    * @param data - Login credentials containing email and password
    * @param onStatusChange - Optional callback for status updates during login flow
+   * @param traceId - Optional trace ID for correlating operations across the auth flow
    * @returns Promise resolving to LoginResult with success status and user data or error
    * 
-   * Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6, 3.1 (debug-form-logout-issue), 1.1, 1.2, 4.1, 4.2, 5.1, 5.2, 5.3, 5.4 (fix-login-backend-mismatch)
+   * Requirements: 1.1, 2.1, 2.3, 2.4, 2.5, 2.6, 3.1, 6.1, 10.1, 10.2
    */
   async login(
     data: LoginRequest,
-    onStatusChange?: (status: LoginStatus) => void
+    onStatusChange?: (status: LoginStatus) => void,
+    traceId?: string
   ): Promise<LoginResult> {
     try {
+      console.log('[AuthService] Login attempt', { email: data.email, traceId });
+
       // Validate email format
       const emailValidation = Validators.validateEmail(data.email);
       if (!emailValidation.isValid) {
@@ -163,7 +165,13 @@ export class AuthService {
       onStatusChange?.({ state: 'authenticating', message: 'Authenticating...' });
 
       // Make API request to backend
+      console.log('[AuthService] Calling backend API', { traceId });
       const response = await this.apiClient.post<LoginResponse>('/auth/login', data);
+      console.log('[AuthService] Backend response received', { 
+        hasToken: !!response.token,
+        email: response.email,
+        traceId 
+      });
 
       // Extract fields from response
       const { token, email: responseEmail, userId: responseUserId } = response;
@@ -178,13 +186,31 @@ export class AuthService {
       }
 
       // Derive userId if not provided in response (backward compatibility)
-      // If userId is in response, use it directly; otherwise derive from JWT or use email
       const userId = responseUserId || deriveUserId(token, responseEmail);
 
-      // Use AuthCoordinator to set both session and JWT token
-      // This ensures synchronization between the two authentication mechanisms
-      // Requirements: 3.1 (debug-form-logout-issue), 1.1, 1.2 (fix-login-backend-mismatch)
-      await setAuth(token, userId, responseEmail);
+      // Notify storing token state
+      onStatusChange?.({ state: 'authenticating', message: 'Storing authentication...' });
+
+      // Store JWT token with verification
+      // Requirements: 6.1, 10.1, 10.2
+      console.log('[AuthService] Storing JWT token', { traceId });
+      const stored = await this.tokenManager.setToken(token, 'authService_login', traceId);
+
+      if (!stored) {
+        console.error('[AuthService] Token storage failed', { traceId });
+        throw new Error('Failed to store authentication token. Please try again.');
+      }
+
+      console.log('[AuthService] Token stored successfully', { traceId });
+
+      // Verify token is retrievable
+      const retrieved = this.tokenManager.getToken('authService_login_verify', traceId);
+      if (!retrieved) {
+        console.error('[AuthService] Token verification failed', { traceId });
+        throw new Error('Failed to verify authentication token. Please try again.');
+      }
+
+      console.log('[AuthService] Token verified successfully', { traceId });
 
       // Notify success state
       onStatusChange?.({ state: 'success', message: 'Login successful!' });
@@ -196,6 +222,11 @@ export class AuthService {
         userId: userId
       };
     } catch (error: any) {
+      console.error('[AuthService] Login error', {
+        error: error.message || String(error),
+        traceId,
+      });
+
       // Parse error and map to user-friendly message
       let errorMessage = 'An unexpected error occurred. Please try again.';
 

@@ -8,6 +8,7 @@ import { LoginFormData, AuthError } from '@/types/auth';
 import { useRateLimit } from './useRateLimit';
 import { authService } from '@/lib/api';
 import { LoginStatus } from '@/lib/api/types';
+import { startTrace, getTraceId } from '@/lib/auth/LoginFlowTracer';
 
 /**
  * Options for configuring the useLoginForm hook
@@ -182,10 +183,17 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
    * Form submission handler
    * Handles authentication API call, rate limiting, and error handling
    * 
+   * Enhanced with:
+   * - Trace ID generation for operation correlation
+   * - Token storage verification before redirect
+   * - Comprehensive logging
+   * 
    * Security Note (Requirement 7.2):
    * Password data is NEVER stored in localStorage or sessionStorage.
    * Passwords are only held in memory during form submission and
    * immediately sent to the server via HTTPS.
+   * 
+   * Requirements: 5.1, 5.3, 5.4, 6.1, 10.1, 10.2
    */
   const onSubmit = useCallback(async (data: LoginFormData, event?: React.BaseSyntheticEvent) => {
     // Defensive: Explicitly prevent default form behavior (Requirements 1.1, 9.1, 9.2)
@@ -194,6 +202,10 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
       event.preventDefault();
       console.log('Default behavior prevented');
     }
+
+    // Generate trace ID for this login flow
+    const traceId = startTrace();
+    console.log('[useLoginForm] Login flow started', { traceId });
     
     // Clear any previous auth errors and reset status
     setAuthError(null);
@@ -214,8 +226,8 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     }
     
     try {
-      // Call authentication API using authService with status callback (Requirement 9.3)
-      console.log('Calling API client login method');
+      // Call authentication API using authService with status callback and trace ID
+      console.log('[useLoginForm] Calling API client login method', { traceId });
       const result = await authService.login(
         {
           email: data.email,
@@ -224,14 +236,14 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
         (newStatus) => {
           // Update status state with callback from authService
           setStatus(newStatus);
-        }
+        },
+        traceId // Pass trace ID for correlation
       );
       
       // Check if login was successful
       if (result.success) {
-        // Token is automatically stored by authService
-        // Success - reset rate limit and redirect to dashboard (Requirement 9.4)
-        console.log('API call successful');
+        // Token is automatically stored and verified by authService
+        console.log('[useLoginForm] Login successful, token stored and verified', { traceId });
         resetRateLimit();
         
         // Clear error messages before redirect (Requirement 7.5)
@@ -239,13 +251,14 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
         
         // Wait 500ms to show success message before redirecting (Requirement 7.1, 7.2)
         setTimeout(() => {
+          console.log('[useLoginForm] Initiating redirect to dashboard', { traceId });
           if (onSuccess) {
             onSuccess('/dashboard');
           }
         }, 500);
       } else {
         // Login failed - handle error
-        console.error('Login failed:', result.error);
+        console.error('[useLoginForm] Login failed', { error: result.error, traceId });
         
         // Record attempt for authentication errors
         if (result.error === 'Invalid email or password') {
@@ -263,7 +276,10 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
       }
     } catch (error) {
       // Handle unexpected errors (Requirement 9.5)
-      console.error('Unexpected error during login:', error);
+      console.error('[useLoginForm] Unexpected error during login', { 
+        error: error instanceof Error ? error.message : String(error),
+        traceId 
+      });
       const authErrorObj: AuthError = {
         type: 'network',
         message: 'Unable to connect. Please check your connection and try again',

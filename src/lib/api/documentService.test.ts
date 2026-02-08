@@ -502,7 +502,7 @@ describe('DocumentService', () => {
   });
 
   describe('downloadDocument', () => {
-    const mockOutputKey = 'outputs/1099-DIV-job-123.pdf';
+    const mockJobId = '550e8400-e29b-41d4-a716-446655440000';
     const mockBlobUrl = 'blob:http://localhost:3000/mock-pdf';
     const mockToken = 'mock-jwt-token';
 
@@ -538,11 +538,11 @@ describe('DocumentService', () => {
 
       (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      const result = await documentService.downloadDocument(mockOutputKey);
+      const result = await documentService.downloadDocument(mockJobId);
 
       // Should call fetch with proxy URL and headers
       expect(global.fetch).toHaveBeenCalledWith(
-        `/api/proxy/download/${encodeURIComponent(mockOutputKey)}`,
+        `/api/proxy/download/${mockJobId}`,
         expect.objectContaining({
           method: 'GET',
           headers: {
@@ -569,7 +569,7 @@ describe('DocumentService', () => {
         writable: true
       });
 
-      await expect(documentService.downloadDocument(mockOutputKey)).rejects.toEqual({
+      await expect(documentService.downloadDocument(mockJobId)).rejects.toEqual({
         status: 401,
         message: 'Authentication required. Please log in again.'
       });
@@ -587,7 +587,7 @@ describe('DocumentService', () => {
 
       (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      await expect(documentService.downloadDocument(mockOutputKey)).rejects.toEqual({
+      await expect(documentService.downloadDocument(mockJobId)).rejects.toEqual({
         status: 401,
         message: 'Unauthorized'
       });
@@ -597,7 +597,7 @@ describe('DocumentService', () => {
       const networkError = new TypeError('Failed to fetch');
       (global.fetch as jest.Mock).mockRejectedValue(networkError);
 
-      await expect(documentService.downloadDocument(mockOutputKey)).rejects.toEqual({
+      await expect(documentService.downloadDocument(mockJobId)).rejects.toEqual({
         status: 0,
         message: 'Unable to download PDF. Please check your network connection and try again.'
       });

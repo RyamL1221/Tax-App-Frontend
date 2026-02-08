@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearAuth } from '@/lib/auth/AuthCoordinator';
 import { logAuthEvent, createAuthState } from '@/lib/auth/AuthLogger';
+import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
 /**
  * Return type for the useLogout hook
@@ -76,6 +77,11 @@ export function useLogout(): UseLogoutReturn {
     setError(null);
     setIsLoading(true);
     
+    // Set logout state FIRST, before any other operations
+    // This signals to all components that logout is in progress
+    // Requirements: 2.1, 2.5
+    logoutStateManager.setLogoutInProgress();
+    
     logAuthEvent(
       'Logout initiated',
       'info',
@@ -83,6 +89,7 @@ export function useLogout(): UseLogoutReturn {
       {
         operation: 'logout',
         source: 'useLogout',
+        logoutInProgress: true,
       }
     );
     
@@ -121,6 +128,10 @@ export function useLogout(): UseLogoutReturn {
       // Keep loading state true until redirect completes
       router.push('/login');
     } catch (err) {
+      // Clear logout state on error to allow retry
+      // Requirements: 2.4
+      logoutStateManager.clearLogoutState();
+      
       // Handle errors gracefully
       setIsLoading(false);
       const errorMessage = 'Failed to log out. Please try again.';

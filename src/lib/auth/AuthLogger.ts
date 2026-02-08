@@ -13,6 +13,8 @@
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
  */
 
+import { logoutStateManager } from './LogoutStateManager';
+
 /**
  * Authentication state interface
  */
@@ -36,6 +38,7 @@ export interface AuthLogEntry {
   timestamp: number;
   level: LogLevel;
   event: string;
+  traceId?: string;
   authState?: AuthState;
   context?: Record<string, unknown>;
 }
@@ -59,17 +62,26 @@ function formatTimestamp(timestamp: number): string {
  * Logs to console in development, minimal logging in production
  */
 function log(entry: AuthLogEntry): void {
-  const { timestamp, level, event, authState, context } = entry;
+  const { timestamp, level, event, traceId, authState, context } = entry;
   const formattedTime = formatTimestamp(timestamp);
+  
+  // Check logout state and add to context
+  const logoutInProgress = logoutStateManager.isLogoutInProgress();
+  const enhancedContext = {
+    ...context,
+    logoutInProgress,
+    ...(traceId && { traceId }),
+  };
   
   // In production, only log warnings and errors
   if (!isDevelopment() && level !== 'warn' && level !== 'error') {
     return;
   }
   
-  // Build log message
+  // Build log message with trace ID if available
   const prefix = `[AuthLogger ${formattedTime}]`;
-  const message = `${prefix} ${event}`;
+  const traceInfo = traceId ? ` [Trace: ${traceId}]` : '';
+  const message = `${prefix}${traceInfo} ${event}`;
   
   // Select console method based on level
   const consoleMethod = level === 'error' ? console.error : 
@@ -81,7 +93,7 @@ function log(entry: AuthLogEntry): void {
     consoleMethod(message, {
       level,
       authState,
-      context,
+      context: enhancedContext,
     });
   } else {
     // In production, log minimal info
@@ -131,15 +143,17 @@ export function logAuthStateChange(
  * @param success - Whether the operation succeeded
  * @param reason - Optional reason for failure or additional context
  * @param source - Optional source component that initiated the operation
+ * @param traceId - Optional trace ID for correlating operations across the auth flow
  * 
  * Security: Never logs actual token values
- * Requirements: 2.2, 2.5
+ * Requirements: 2.2, 2.5, 1.1, 1.2, 2.1
  */
 export function logTokenOperation(
   operation: 'set' | 'get' | 'clear' | 'validate',
   success: boolean,
   reason?: string,
-  source?: string
+  source?: string,
+  traceId?: string
 ): void {
   const level: LogLevel = success ? 'info' : 'warn';
   const status = success ? 'succeeded' : 'failed';
@@ -148,6 +162,7 @@ export function logTokenOperation(
     timestamp: Date.now(),
     level,
     event: `Token ${operation} ${status}`,
+    traceId,
     context: {
       operation,
       success,
@@ -289,9 +304,10 @@ export class AuthLogger {
     operation: 'set' | 'get' | 'clear' | 'validate',
     success: boolean,
     reason?: string,
-    source?: string
+    source?: string,
+    traceId?: string
   ): void {
-    logTokenOperation(operation, success, reason, source);
+    logTokenOperation(operation, success, reason, source, traceId);
   }
 
   logAuthFailure(

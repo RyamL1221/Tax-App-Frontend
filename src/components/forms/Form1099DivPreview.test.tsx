@@ -120,7 +120,7 @@ describe('Form1099DivPreview', () => {
 
       // Wait for PDF to load
       await waitFor(() => {
-        expect(documentService.downloadDocument).toHaveBeenCalledWith(mockDocument.outputKey);
+        expect(documentService.downloadDocument).toHaveBeenCalledWith(mockDocument.jobId);
       });
 
       // Should display iframe with PDF

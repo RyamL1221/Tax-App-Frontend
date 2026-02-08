@@ -382,7 +382,9 @@ describe('AuthLogger', () => {
       logAuthEvent('Event with context', 'info', undefined, context);
       
       const call = consoleLogSpy.mock.calls[0];
-      expect(call[1]).toHaveProperty('context', context);
+      // Context should include the provided context plus logoutInProgress
+      expect(call[1].context).toMatchObject(context);
+      expect(call[1].context).toHaveProperty('logoutInProgress');
     });
 
     it('should log errors in production mode', () => {
