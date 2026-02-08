@@ -23,11 +23,11 @@ import {
   LoginResponse,
   LoginStatus,
   LoginResult,
+  JWTPayload,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   ResetPasswordRequest,
-  ResetPasswordResponse,
-  JWTPayload
+  ResetPasswordResponse
 } from './types';
 
 /**
@@ -261,7 +261,7 @@ export class AuthService {
    * @returns Promise resolving to ForgotPasswordResponse with success message
    * @throws ApiError if validation fails or API request fails (including 429 rate limit)
    * 
-   * Requirements: 3.6
+   * Requirements: 3.6, 10.3
    */
   async forgotPassword(data: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
     // Validate email format
