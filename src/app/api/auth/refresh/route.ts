@@ -1,18 +1,15 @@
 /**
  * JWT Refresh API Route
- *
- * POST /api/auth/refresh - Attempt to refresh JWT token from valid session
- *
- * IMPORTANT: The backend API does NOT have a `/auth/refresh` endpoint.
- * The only way to obtain a JWT token is through the `/auth/login` endpoint.
- * A session cookie alone cannot produce a JWT token. This route therefore
- * fails fast with a clear error message rather than making a doomed HTTP
- * call to a non-existent backend endpoint.
- *
- * Callers (e.g., AuthCoordinator) should treat any error from this route
- * as a signal that the user must re-authenticate via the login page.
- *
- * Requirements: 4.1, 4.2, 4.3
+ * 
+ * POST /api/auth/refresh - Refresh JWT token from valid session
+ * 
+ * Returns a new JWT token if the user has a valid session.
+ * Used by AuthCoordinator when JWT is missing but session exists.
+ * 
+ * Note: This endpoint calls the backend API to get a fresh JWT token.
+ * The backend handles JWT signing with the proper secret.
+ * 
+ * Requirements: 8.2
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,14 +17,12 @@ import { getSession } from '@/lib/session';
 
 /**
  * POST /api/auth/refresh
- *
- * Returns an immediate error because the backend has no refresh endpoint.
- * Session validation is still performed so that callers receive an accurate
- * diagnosis (no session vs. expired session vs. refresh not supported).
- *
- * @returns 501 Not Implemented — refresh is not supported by the backend
- * @returns 401 Unauthorized — no valid session or session expired
- * @returns 500 Internal Server Error — unexpected failure
+ * 
+ * Generate a new JWT token from the current session by calling the backend.
+ * This endpoint is used by the AuthCoordinator to refresh JWT
+ * when the token is missing but a valid session exists.
+ * 
+ * @returns 200 OK with new token if session valid, 401 Unauthorized if not
  */
 export async function POST(request: NextRequest) {
   try {
@@ -50,19 +45,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // The backend does not expose a /auth/refresh endpoint.
-    // A valid session exists but cannot be exchanged for a JWT token.
-    // Return 501 to clearly indicate that token refresh is not supported.
-    // The user must re-authenticate via /auth/login to obtain a new JWT.
-    console.warn('[JWT Refresh] Refresh not supported — backend has no /auth/refresh endpoint', {
-      userId: session.userId,
-      email: session.email,
-    });
+    // Call backend API to get a fresh JWT token
+    // The backend will sign the token with the proper secret
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    
+    try {
+      const response = await fetch(`${backendUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: session.userId,
+          email: session.email,
+        }),
+      });
 
-    return NextResponse.json(
-      { error: 'Token refresh is not supported. Please log in again to obtain a new token.' },
-      { status: 501 }
-    );
+      if (!response.ok) {
+        console.error('[JWT Refresh] Backend refresh failed', {
+          status: response.status,
+        });
+        return NextResponse.json(
+          { error: 'Failed to refresh token from backend' },
+          { status: response.status }
+        );
+      }
+
+      const data = await response.json();
+      
+      if (!data.token) {
+        console.error('[JWT Refresh] Backend response missing token');
+        return NextResponse.json(
+          { error: 'Invalid refresh response' },
+          { status: 500 }
+        );
+      }
+
+      console.log('[JWT Refresh] Token refreshed successfully', {
+        userId: session.userId,
+        email: session.email,
+      });
+
+      // Return new token
+      return NextResponse.json({
+        token: data.token,
+        userId: session.userId,
+        email: session.email,
+      }, { status: 200 });
+
+    } catch (backendError) {
+      console.error('[JWT Refresh] Backend call failed:', backendError);
+      return NextResponse.json(
+        { error: 'Failed to connect to backend' },
+        { status: 503 }
+      );
+    }
 
   } catch (error) {
     console.error('[JWT Refresh] Error:', error);

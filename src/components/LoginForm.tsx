@@ -51,7 +51,6 @@ export function LoginForm({ className, onSuccess, onError }: LoginFormProps) {
     showPassword,
     togglePasswordVisibility,
     onSubmit,
-    authError,
     isRateLimited,
     rateLimitRemainingTime,
     clearFieldError,
@@ -64,36 +63,11 @@ export function LoginForm({ className, onSuccess, onError }: LoginFormProps) {
       className={cn('space-y-6', className)}
       noValidate
     >
-      {/* General Error Message */}
-      {authError && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="p-4 rounded-md bg-red-50 border border-red-200"
-        >
-          <div className="flex items-start">
-            <svg
-              className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <p className="text-sm text-red-800">{authError}</p>
-          </div>
-        </div>
-      )}
-
       {/* Status Message Display */}
       {status.state !== 'idle' && (
         <div
-          role="status"
-          aria-live="polite"
+          role={status.state === 'error' ? 'alert' : 'status'}
+          aria-live={status.state === 'error' ? 'assertive' : 'polite'}
           className={cn(
             'p-4 rounded-md border transition-all duration-200',
             status.state === 'authenticating' && 'bg-blue-50 border-blue-200',

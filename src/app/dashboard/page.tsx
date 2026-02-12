@@ -11,8 +11,8 @@ import DashboardClient from './DashboardClient';
  * Dashboard Page Component
  * 
  * Protected route that verifies user authentication before rendering the dashboard.
- * Implements comprehensive error handling, timeout protection, and logout state
- * integration to prevent black screen issues and ensure reliable redirects.
+ * Implements comprehensive error handling and logout state integration
+ * to prevent black screen issues and ensure reliable redirects.
  * 
  * ## Authentication Strategy
  * 
@@ -86,26 +86,6 @@ import DashboardClient from './DashboardClient';
  * });
  * ```
  * Requirements: 3.1, 5.5
- * 
- * ## Timeout Protection
- * 
- * Prevents authentication check from hanging indefinitely:
- * 
- * - **Timeout Duration**: 2000ms (2 seconds)
- * - **Trigger**: Set when useEffect runs
- * - **Action**: Forces redirect to /login if timeout fires
- * - **Cleanup**: Cleared when redirect succeeds or auth completes
- * - **Warning**: Logs "Authentication check timeout, forcing redirect"
- * 
- * The timeout is cleared in multiple scenarios:
- * 1. Successful router.push() redirect
- * 2. Successful window.location.href fallback
- * 3. Successful authentication (token valid)
- * 4. Error recovery redirect
- * 5. Component unmount
- * 
- * This ensures users are never stuck on a loading screen for more than 2 seconds.
- * Requirements: 2.4
  * 
  * ## Logout State Integration
  * 
@@ -221,7 +201,6 @@ import DashboardClient from './DashboardClient';
  * - 1.5: Error-free authentication check
  * - 2.2: Loading state during redirect
  * - 2.3: Loading state visibility
- * - 2.4: Timeout protection
  * - 2.5: Loading state visual distinction
  * - 3.1: Error logging with context
  * - 3.2: Error recovery redirect
@@ -304,8 +283,8 @@ export default function DashboardPage() {
    * Authentication Check Effect
    * 
    * Runs once per component mount to verify user authentication and
-   * redirect if necessary. Implements timeout protection, comprehensive
-   * error handling, logout state integration, and AuthCoordinator integration.
+   * redirect if necessary. Implements comprehensive error handling,
+   * logout state integration, and AuthCoordinator integration.
    * 
    * Enhanced with:
    * - Redirect guard to prevent multiple redirects
@@ -332,43 +311,9 @@ export default function DashboardPage() {
 
     authCheckInProgressRef.current = true;
 
-    /**
-     * Timeout ID for authentication check timeout protection
-     * 
-     * Set to a 2-second timeout when the effect runs. Cleared when:
-     * - Redirect succeeds (router.push or window.location.href)
-     * - Authentication succeeds (valid token found)
-     * - Error recovery redirect succeeds
-     * - Component unmounts
-     * 
-     * If the timeout fires, it forces a redirect to /login to prevent
-     * users from being stuck on a loading screen indefinitely.
-     * 
-     * Requirements: 2.4
-     */
-    let timeoutId: NodeJS.Timeout | null = null;
-
     // Get trace ID from login flow if available
     const traceId = getTraceId();
     console.log('[Dashboard] Starting authentication check', { traceId });
-
-    // Set timeout protection
-    timeoutId = setTimeout(() => {
-      console.warn('[Dashboard] Authentication check timeout, forcing redirect', { traceId });
-      if (typeof window !== 'undefined' && !redirectInitiatedRef.current) {
-        redirectInitiatedRef.current = true;
-        
-        // Build redirect URL with return URL parameter
-        let redirectUrl = '/login?returnUrl=/dashboard';
-        const currentParams = new URLSearchParams(window.location.search);
-        if (currentParams.toString()) {
-          redirectUrl = `/login?returnUrl=${encodeURIComponent('/dashboard?' + currentParams.toString())}`;
-        }
-        
-        console.log('[Dashboard] Timeout redirect URL', { redirectUrl, traceId });
-        window.location.href = redirectUrl;
-      }
-    }, 2000);
 
     /**
      * Authentication Check Function
@@ -416,8 +361,6 @@ export default function DashboardPage() {
         const authState = await getAuthState({ requireJWT: true, traceId: traceId || undefined });
         console.log('[Dashboard] Auth state received', { 
           isAuthenticated: authState.isAuthenticated,
-          hasJWT: authState.hasJWT,
-          hasSession: authState.hasSession,
           authMethod: authState.authMethod,
           inFallbackMode: authState.inFallbackMode,
           reason: authState.reason,
@@ -443,14 +386,11 @@ export default function DashboardPage() {
               console.log('[Dashboard] Redirecting to login (not authenticated)', { 
                 traceId,
                 reason: authState.reason,
-                hasJWT: authState.hasJWT,
-                hasSession: authState.hasSession,
                 redirectUrl,
               });
               
               try {
                 router.push(redirectUrl);
-                if (timeoutId) clearTimeout(timeoutId);
                 console.log('[Dashboard] Redirect initiated successfully', { traceId, redirectUrl });
               } catch (navError) {
                 console.error('[Dashboard] router.push failed, using fallback', {
@@ -461,7 +401,6 @@ export default function DashboardPage() {
                   redirectUrl,
                 });
                 if (typeof window !== 'undefined') {
-                  if (timeoutId) clearTimeout(timeoutId);
                   window.location.href = redirectUrl;
                   console.log('[Dashboard] Fallback redirect initiated successfully', { traceId, redirectUrl });
                 }
@@ -469,7 +408,6 @@ export default function DashboardPage() {
             }
           } else {
             // Authenticated - show dashboard
-            if (timeoutId) clearTimeout(timeoutId);
             console.log('[Dashboard] Authentication successful', { 
               authMethod: authState.authMethod,
               inFallbackMode: authState.inFallbackMode,
@@ -523,7 +461,6 @@ export default function DashboardPage() {
             try {
               console.log('[Dashboard] Redirecting to login (error recovery)', { traceId, redirectUrl });
               router.push(redirectUrl);
-              if (timeoutId) clearTimeout(timeoutId);
               console.log('[Dashboard] Error recovery redirect initiated successfully', { traceId, redirectUrl });
             } catch (navError) {
               console.error('[Dashboard] Error recovery navigation failed, using fallback', {
@@ -534,7 +471,6 @@ export default function DashboardPage() {
                 redirectUrl,
               });
               if (typeof window !== 'undefined') {
-                if (timeoutId) clearTimeout(timeoutId);
                 window.location.href = redirectUrl;
                 console.log('[Dashboard] Fallback error recovery redirect initiated successfully', { traceId, redirectUrl });
               }
@@ -557,7 +493,6 @@ export default function DashboardPage() {
       
       authCheckInProgressRef.current = false;
       
-      if (timeoutId) clearTimeout(timeoutId);
       if (typeof window !== 'undefined' && !redirectInitiatedRef.current) {
         redirectInitiatedRef.current = true;
         
@@ -575,7 +510,6 @@ export default function DashboardPage() {
 
     return () => {
       console.log('[Dashboard] Component unmounting', { traceId });
-      if (timeoutId) clearTimeout(timeoutId);
       isMountedRef.current = false;
       authCheckInProgressRef.current = false;
     };

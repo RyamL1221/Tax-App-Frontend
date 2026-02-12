@@ -74,7 +74,6 @@ describe('LoginForm - Property-Based Tests', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: mockOnSubmit,
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -133,7 +132,6 @@ describe('LoginForm - Property-Based Tests', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: mockOnSubmit,
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -193,7 +191,6 @@ describe('LoginForm - Property-Based Tests', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: mockOnSubmit,
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -244,11 +241,10 @@ describe('LoginForm - Property-Based Tests', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: testData.errorMessage,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
-          status: { state: 'idle', message: '' },
+            status: { state: 'error', message: testData.errorMessage },
           });
 
           const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);

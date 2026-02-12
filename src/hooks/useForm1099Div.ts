@@ -18,9 +18,9 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { documentService } from '@/lib/api';
 import type { Form1099DivData, GenerateDocumentResponse } from '@/lib/api';
-import { validateAuth } from '@/lib/auth/AuthCoordinator';
 import { logAuthEvent, createAuthState } from '@/lib/auth/AuthLogger';
 import { saveFormData, restoreFormData, clearFormData, hasSavedFormData } from '@/lib/auth/FormDataPreserver';
+import { hasToken } from '@/lib/api/tokenManager';
 
 /**
  * Return type for useForm1099Div hook
@@ -192,22 +192,21 @@ export function useForm1099Div(token: string | null): UseForm1099DivReturn {
    */
   const handleGeneratePreview = async (data: Form1099DivData): Promise<void> => {
     // Validate JWT token before proceeding (Requirement 4.4)
-    const validationResult = validateAuth();
+    const hasValidToken = hasToken('Form1099Div');
     
     logAuthEvent(
       'Form submission JWT validation',
-      validationResult.valid ? 'info' : 'warn',
-      createAuthState(false, validationResult.valid, null, null),
+      hasValidToken ? 'info' : 'warn',
+      createAuthState(hasValidToken, null, null),
       {
         operation: 'form-submission-validation',
-        valid: validationResult.valid,
-        reason: validationResult.reason,
-        canRecover: validationResult.canRecover,
+        valid: hasValidToken,
+        reason: hasValidToken ? 'JWT token present' : 'No JWT token found',
       }
     );
     
-    if (!validationResult.valid) {
-      const errorMsg = validationResult.reason || 'Authentication required. Please log in again.';
+    if (!hasValidToken) {
+      const errorMsg = 'Authentication required. Please log in again.';
       console.error('[Form1099Div] JWT validation failed:', errorMsg);
       
       // Store form data for potential recovery (Requirement 4.5)

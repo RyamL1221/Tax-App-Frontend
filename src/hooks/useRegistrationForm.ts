@@ -29,7 +29,6 @@ export interface RegistrationFormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
-  general?: string;
 }
 
 /**
@@ -167,15 +166,6 @@ export function useRegistrationForm(
       setErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[name as keyof RegistrationFormErrors];
-        return newErrors;
-      });
-    }
-    
-    // Also clear general error when user starts typing
-    if (errors.general) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.general;
         return newErrors;
       });
     }
@@ -353,22 +343,11 @@ export function useRegistrationForm(
             ...prev,
             email: 'This email is already registered. Please log in instead.'
           }));
-        } else {
-          // Other API errors
-          setErrors(prev => ({
-            ...prev,
-            general: error.message || 'Registration failed. Please try again.'
-          }));
         }
       } else {
         // Network error - set status to network error message
         setStatusMessage('Network error. Please check your connection and try again.');
         setStatusType('error');
-        
-        setErrors(prev => ({
-          ...prev,
-          general: 'Network error. Please check your connection and try again.'
-        }));
       }
     } finally {
       // Stop loading state

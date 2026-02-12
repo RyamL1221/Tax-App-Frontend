@@ -39,6 +39,9 @@ describe('RegistrationForm', () => {
       handleBlur: mockHandleBlur,
       handleSubmit: mockHandleSubmit,
       clearError: jest.fn(),
+      statusMessage: null,
+      statusType: null,
+      clearStatus: jest.fn(),
     });
   });
 
@@ -167,9 +170,7 @@ describe('RegistrationForm', () => {
           password: 'Password123!',
           confirmPassword: 'Password123!',
         },
-        errors: {
-          general: 'Network error. Please check your connection and try again.',
-        },
+        errors: {},
         isLoading: false,
         isRateLimited: false,
         rateLimitMessage: '',
@@ -178,18 +179,15 @@ describe('RegistrationForm', () => {
         handleBlur: mockHandleBlur,
         handleSubmit: mockHandleSubmit,
         clearError: jest.fn(),
+        statusMessage: 'Network error. Please check your connection and try again.',
+        statusType: 'error' as const,
+        clearStatus: jest.fn(),
       });
 
       render(<RegistrationForm onSuccess={mockOnSuccess} />);
 
-      // Verify the error message is displayed
-      const errorAlert = screen.getByRole('alert');
-      expect(errorAlert).toBeInTheDocument();
-      expect(errorAlert).toHaveTextContent('Network error. Please check your connection and try again.');
-      
-      // Verify accessibility attributes
-      expect(errorAlert).toHaveAttribute('aria-live', 'assertive');
-      expect(errorAlert).toHaveAttribute('role', 'alert');
+      // Verify the error message is displayed in StatusMessage component
+      expect(screen.getByText('Network error. Please check your connection and try again.')).toBeInTheDocument();
     });
 
     /**
@@ -298,9 +296,7 @@ describe('RegistrationForm', () => {
           password: 'Password123!',
           confirmPassword: 'Password123!',
         },
-        errors: {
-          general: 'Registration failed. Please try again.',
-        },
+        errors: {},
         isLoading: false,
         isRateLimited: false,
         rateLimitMessage: '',
@@ -309,12 +305,14 @@ describe('RegistrationForm', () => {
         handleBlur: mockHandleBlur,
         handleSubmit: mockHandleSubmit,
         clearError: jest.fn(),
+        statusMessage: 'Registration failed. Please try again.',
+        statusType: 'error' as const,
+        clearStatus: jest.fn(),
       });
 
       render(<RegistrationForm onSuccess={mockOnSuccess} />);
 
-      const errorAlert = screen.getByRole('alert');
-      expect(errorAlert).toHaveTextContent(/registration failed/i);
+      expect(screen.getByText(/registration failed/i)).toBeInTheDocument();
     });
 
     it('should display rate limit message', () => {
@@ -460,6 +458,212 @@ describe('RegistrationForm', () => {
       
       // Restore console methods
       consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe('Single Error Display (Unit Tests)', () => {
+    // Task 4.2: Write unit test for single error display in RegistrationForm
+    // Feature: fix-duplicate-error-popups, Property 1: Single Error Display
+    // **Validates: Requirements 1.2, 1.4, 1.5**
+    
+    it('should display exactly one error popup for network errors', () => {
+      mockUseRegistrationForm.mockReturnValue({
+        formData: {
+          fullName: 'John Doe',
+          email: 'test@example.com',
+          password: 'Password123!',
+          confirmPassword: 'Password123!',
+        },
+        errors: {},
+        isLoading: false,
+        isRateLimited: false,
+        rateLimitMessage: '',
+        passwordStrength: PasswordStrength.STRONG,
+        handleChange: mockHandleChange,
+        handleBlur: mockHandleBlur,
+        handleSubmit: mockHandleSubmit,
+        clearError: jest.fn(),
+        statusMessage: 'Network error. Please check your connection and try again.',
+        statusType: 'error' as const,
+        clearStatus: jest.fn(),
+      });
+
+      render(<RegistrationForm onSuccess={mockOnSuccess} />);
+
+      // Count all elements with role="alert" (error messages)
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have exactly one alert for the network error
+      expect(alerts).toHaveLength(1);
+      
+      // Verify it contains the network error message
+      expect(alerts[0]).toHaveTextContent('Network error. Please check your connection and try again.');
+    });
+
+    it('should display exactly one error popup for API errors (409 conflict)', () => {
+      mockUseRegistrationForm.mockReturnValue({
+        formData: {
+          fullName: 'John Doe',
+          email: 'existing@example.com',
+          password: 'Password123!',
+          confirmPassword: 'Password123!',
+        },
+        errors: {
+          email: 'This email is already registered. Please log in instead.',
+        },
+        isLoading: false,
+        isRateLimited: false,
+        rateLimitMessage: '',
+        passwordStrength: PasswordStrength.STRONG,
+        handleChange: mockHandleChange,
+        handleBlur: mockHandleBlur,
+        handleSubmit: mockHandleSubmit,
+        clearError: jest.fn(),
+        statusMessage: 'This email is already registered. Please log in instead.',
+        statusType: 'error' as const,
+        clearStatus: jest.fn(),
+      });
+
+      render(<RegistrationForm onSuccess={mockOnSuccess} />);
+
+      // Count all elements with role="alert"
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have exactly 2 alerts: one for the status message and one for the field error
+      // This is expected because field-specific errors are displayed inline
+      expect(alerts).toHaveLength(2);
+      
+      // Verify the status message alert
+      const statusAlert = alerts.find(alert => 
+        alert.textContent?.includes('This email is already registered')
+      );
+      expect(statusAlert).toBeDefined();
+      
+      // Verify the field error alert
+      const fieldAlert = alerts.find(alert => 
+        alert.getAttribute('id') === 'email-error'
+      );
+      expect(fieldAlert).toBeDefined();
+    });
+
+    it('should display exactly one error popup for API errors (500 server error)', () => {
+      mockUseRegistrationForm.mockReturnValue({
+        formData: {
+          fullName: 'John Doe',
+          email: 'test@example.com',
+          password: 'Password123!',
+          confirmPassword: 'Password123!',
+        },
+        errors: {},
+        isLoading: false,
+        isRateLimited: false,
+        rateLimitMessage: '',
+        passwordStrength: PasswordStrength.STRONG,
+        handleChange: mockHandleChange,
+        handleBlur: mockHandleBlur,
+        handleSubmit: mockHandleSubmit,
+        clearError: jest.fn(),
+        statusMessage: 'Registration failed. Please try again.',
+        statusType: 'error' as const,
+        clearStatus: jest.fn(),
+      });
+
+      render(<RegistrationForm onSuccess={mockOnSuccess} />);
+
+      // Count all elements with role="alert"
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have exactly one alert for the server error
+      expect(alerts).toHaveLength(1);
+      
+      // Verify it contains the server error message
+      expect(alerts[0]).toHaveTextContent('Registration failed. Please try again.');
+    });
+
+    it('should not display errors.general (removed in task 4.1)', () => {
+      // This test verifies that the old errors.general display has been removed
+      mockUseRegistrationForm.mockReturnValue({
+        formData: {
+          fullName: 'John Doe',
+          email: 'test@example.com',
+          password: 'Password123!',
+          confirmPassword: 'Password123!',
+        },
+        errors: {},
+        isLoading: false,
+        isRateLimited: false,
+        rateLimitMessage: '',
+        passwordStrength: PasswordStrength.STRONG,
+        handleChange: mockHandleChange,
+        handleBlur: mockHandleBlur,
+        handleSubmit: mockHandleSubmit,
+        clearError: jest.fn(),
+        statusMessage: 'Some error message',
+        statusType: 'error' as const,
+        clearStatus: jest.fn(),
+      });
+
+      const { container } = render(<RegistrationForm onSuccess={mockOnSuccess} />);
+
+      // Verify that there's no element displaying errors.general
+      // The old implementation had a separate div for errors.general
+      // Now only statusMessage should be displayed
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have exactly one alert (from statusMessage)
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0]).toHaveTextContent('Some error message');
+      
+      // Verify no duplicate error messages in the DOM
+      const errorText = container.textContent || '';
+      const occurrences = (errorText.match(/Some error message/g) || []).length;
+      expect(occurrences).toBe(1);
+    });
+
+    it('should display field-specific errors inline (not as general errors)', () => {
+      mockUseRegistrationForm.mockReturnValue({
+        formData: {
+          fullName: '',
+          email: 'invalid-email',
+          password: 'weak',
+          confirmPassword: 'different',
+        },
+        errors: {
+          fullName: 'Full name is required',
+          email: 'Please enter a valid email address',
+          password: 'Password must be at least 8 characters',
+          confirmPassword: 'Passwords do not match',
+        },
+        isLoading: false,
+        isRateLimited: false,
+        rateLimitMessage: '',
+        passwordStrength: PasswordStrength.WEAK,
+        handleChange: mockHandleChange,
+        handleBlur: mockHandleBlur,
+        handleSubmit: mockHandleSubmit,
+        clearError: jest.fn(),
+        statusMessage: null,
+        statusType: null,
+        clearStatus: jest.fn(),
+      });
+
+      render(<RegistrationForm onSuccess={mockOnSuccess} />);
+
+      // All field errors should be displayed inline with role="alert"
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have 4 alerts (one for each field error)
+      expect(alerts).toHaveLength(4);
+      
+      // Verify each field error is displayed
+      expect(screen.getByText('Full name is required')).toBeInTheDocument();
+      expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
+      expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
+      expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
+      
+      // Verify no general error message is displayed
+      expect(screen.queryByText(/registration failed/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
     });
   });
 

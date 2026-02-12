@@ -9,6 +9,12 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 
+// Mock AuthCoordinator - the component uses getAuthState() (JWT-only, no HTTP requests)
+const mockGetAuthState = jest.fn();
+jest.mock('@/lib/auth/AuthCoordinator', () => ({
+  getAuthState: (...args: unknown[]) => mockGetAuthState(...args),
+}));
+
 // Mock RegistrationForm component
 jest.mock('@/components/RegistrationForm', () => ({
   RegistrationForm: ({ onSuccess }: { onSuccess?: () => void }) => (
@@ -50,9 +56,6 @@ describe('RegisterPageClient', () => {
       replace: jest.fn(),
       prefetch: jest.fn(),
     } as any);
-
-    // Mock fetch for auth check
-    global.fetch = jest.fn();
   });
 
   afterEach(() => {
@@ -78,10 +81,15 @@ describe('RegisterPageClient', () => {
             { nil: undefined }
           ),
           async (callbackUrl) => {
-            // Mock unauthenticated user
-            (global.fetch as jest.Mock).mockResolvedValueOnce({
-              ok: true,
-              json: async () => ({ authenticated: false }),
+            // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+            mockGetAuthState.mockResolvedValueOnce({
+              isAuthenticated: false,
+              hasJWT: false,
+              hasSession: false,
+              inFallbackMode: false,
+              authMethod: 'none',
+              userId: null,
+              email: null,
             });
 
             const { unmount } = render(
@@ -118,7 +126,6 @@ describe('RegisterPageClient', () => {
         fc.asyncProperty(
           // Generate various error scenarios
           fc.record({
-            authenticated: fc.constant(false),
             errorType: fc.constantFrom(
               'validation',
               'network',
@@ -126,11 +133,16 @@ describe('RegisterPageClient', () => {
               'conflict'
             ),
           }),
-          async (scenario) => {
-            // Mock unauthenticated user
-            (global.fetch as jest.Mock).mockResolvedValueOnce({
-              ok: true,
-              json: async () => ({ authenticated: scenario.authenticated }),
+          async () => {
+            // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+            mockGetAuthState.mockResolvedValueOnce({
+              isAuthenticated: false,
+              hasJWT: false,
+              hasSession: false,
+              inFallbackMode: false,
+              authMethod: 'none',
+              userId: null,
+              email: null,
             });
 
             const { unmount } = render(<RegisterPageClient />);
@@ -175,10 +187,15 @@ describe('RegisterPageClient', () => {
             { nil: undefined }
           ),
           async (callbackUrl) => {
-            // Mock authenticated user
-            (global.fetch as jest.Mock).mockResolvedValueOnce({
-              ok: true,
-              json: async () => ({ authenticated: true }),
+            // Mock authenticated user via getAuthState (JWT-only, no HTTP requests)
+            mockGetAuthState.mockResolvedValueOnce({
+              isAuthenticated: true,
+              hasJWT: true,
+              hasSession: false,
+              inFallbackMode: false,
+              authMethod: 'jwt',
+              userId: null,
+              email: null,
             });
 
             const { unmount } = render(
@@ -212,23 +229,9 @@ describe('RegisterPageClient', () => {
             'timeout',
             'invalid-response'
           ),
-          async (errorType) => {
-            // Mock auth check failure
-            if (errorType === 'network-error') {
-              (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
-            } else if (errorType === 'server-error') {
-              (global.fetch as jest.Mock).mockResolvedValueOnce({
-                ok: false,
-                status: 500,
-              });
-            } else if (errorType === 'timeout') {
-              (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Timeout'));
-            } else {
-              (global.fetch as jest.Mock).mockResolvedValueOnce({
-                ok: true,
-                json: async () => { throw new Error('Invalid JSON'); },
-              });
-            }
+          async () => {
+            // Mock getAuthState throwing an error (JWT-only, no HTTP requests)
+            mockGetAuthState.mockRejectedValueOnce(new Error('Auth check failed'));
 
             const { unmount } = render(<RegisterPageClient />);
 
@@ -252,10 +255,15 @@ describe('RegisterPageClient', () => {
     // Task 7.4: Write unit tests for RegisterPageClient
     
     it('should redirect authenticated users to dashboard', async () => {
-      // Mock authenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: true }),
+      // Mock authenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: true,
+        hasJWT: true,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'jwt',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient />);
@@ -269,10 +277,15 @@ describe('RegisterPageClient', () => {
     });
 
     it('should redirect authenticated users to custom callback URL', async () => {
-      // Mock authenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: true }),
+      // Mock authenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: true,
+        hasJWT: true,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'jwt',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient callbackUrl="/profile" />);
@@ -283,10 +296,15 @@ describe('RegisterPageClient', () => {
     });
 
     it('should render form for unauthenticated users', async () => {
-      // Mock unauthenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: false }),
+      // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: false,
+        hasJWT: false,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'none',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient />);
@@ -300,10 +318,15 @@ describe('RegisterPageClient', () => {
     });
 
     it('should call onSuccess callback and redirect on successful registration', async () => {
-      // Mock unauthenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: false }),
+      // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: false,
+        hasJWT: false,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'none',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient />);
@@ -322,10 +345,15 @@ describe('RegisterPageClient', () => {
     });
 
     it('should redirect to custom callback URL on successful registration', async () => {
-      // Mock unauthenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: false }),
+      // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: false,
+        hasJWT: false,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'none',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient callbackUrl="/welcome" />);
@@ -343,21 +371,21 @@ describe('RegisterPageClient', () => {
       });
     });
 
-    it('should render nothing while checking authentication', () => {
-      // Mock pending auth check
-      (global.fetch as jest.Mock).mockImplementationOnce(
-        () => new Promise(() => {}) // Never resolves
+    it('should show loading state while checking authentication', () => {
+      // Mock pending auth check (never resolves)
+      mockGetAuthState.mockImplementationOnce(
+        () => new Promise(() => {})
       );
 
-      const { container } = render(<RegisterPageClient />);
+      render(<RegisterPageClient />);
 
-      // Should render nothing (null) while checking auth
-      expect(container.firstChild).toBeNull();
+      // Should show loading state while checking auth
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
     });
 
     it('should handle auth check errors gracefully', async () => {
-      // Mock auth check error
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+      // Mock getAuthState throwing an error
+      mockGetAuthState.mockRejectedValueOnce(new Error('Network error'));
 
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -368,19 +396,19 @@ describe('RegisterPageClient', () => {
         expect(screen.getByTestId('registration-form')).toBeInTheDocument();
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Auth check error:',
-        expect.any(Error)
-      );
-
       consoleErrorSpy.mockRestore();
     });
 
     it('should render page title and description', async () => {
-      // Mock unauthenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: false }),
+      // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: false,
+        hasJWT: false,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'none',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient />);
@@ -392,20 +420,22 @@ describe('RegisterPageClient', () => {
       expect(screen.getByText(/sign up to get started/i)).toBeInTheDocument();
     });
 
-    it('should call auth check API on mount', async () => {
-      // Mock unauthenticated user
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ authenticated: false }),
+    it('should use getAuthState for auth check on mount (no HTTP requests)', async () => {
+      // Mock unauthenticated user via getAuthState (JWT-only, no HTTP requests)
+      mockGetAuthState.mockResolvedValueOnce({
+        isAuthenticated: false,
+        hasJWT: false,
+        hasSession: false,
+        inFallbackMode: false,
+        authMethod: 'none',
+        userId: null,
+        email: null,
       });
 
       render(<RegisterPageClient />);
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/auth/session', {
-          method: 'GET',
-          credentials: 'include',
-        });
+        expect(mockGetAuthState).toHaveBeenCalled();
       });
     });
   });

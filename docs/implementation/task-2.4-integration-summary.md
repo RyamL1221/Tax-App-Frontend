@@ -1,5 +1,7 @@
 # Task 2.4: AuthCoordinator Integration with Login Flow - Summary
 
+> **⚠️ Historical Note:** This document describes the original dual-authentication implementation (JWT + session cookies). The `/api/auth/session` route and session-based authentication have since been **removed** as part of the JWT-only authentication migration (see `.kiro/specs/fix-post-login-loop/`). Authentication is now determined solely by JWT token presence in localStorage. The AuthCoordinator no longer makes any HTTP requests during auth checks. This document is preserved as a historical record.
+
 ## Overview
 
 Successfully integrated AuthCoordinator with the login flow to ensure both session cookies and JWT tokens are set when users log in. This addresses Requirement 3.1 from the debug-form-logout-issue spec.
@@ -172,21 +174,23 @@ The following tasks remain in Phase 2:
 
 ## Notes
 
+> **⚠️ Updated:** The dual authentication system described below has been superseded. The `/api/auth/session` route and session-based authentication have been removed. The application now uses JWT-only authentication. See `.kiro/specs/fix-post-login-loop/` for details.
+
 - The backend API at `http://127.0.0.1:3000` is stateless and only returns JWT tokens
-- The frontend creates its own session cookies for page access control
-- This dual authentication system is intentional and addresses different concerns:
-  - JWT: Backend API authentication
-  - Session: Frontend page access control
-- AuthCoordinator ensures these two mechanisms stay synchronized
+- ~~The frontend creates its own session cookies for page access control~~ — Session cookies are no longer used
+- ~~This dual authentication system is intentional and addresses different concerns:~~
+  - JWT: Backend API authentication (still active — sole authentication mechanism)
+  - ~~Session: Frontend page access control~~ — Removed
+- ~~AuthCoordinator ensures these two mechanisms stay synchronized~~ — AuthCoordinator now uses JWT-only, no HTTP requests
 
 ## Files Modified
 
 1. `src/lib/auth/AuthCoordinator.ts` - Made setAuth async, added session creation
 2. `src/lib/api/authService.ts` - Updated to use AuthCoordinator.setAuth()
 3. `src/lib/auth/AuthCoordinator.test.ts` - Updated tests for async setAuth
-4. `src/app/api/auth/session/route.ts` - New API route for session creation
+4. ~~`src/app/api/auth/session/route.ts`~~ - **Removed** (session route no longer exists)
 
 ## Files Created
 
-1. `src/app/api/auth/session/route.ts` - Session management API route
+1. ~~`src/app/api/auth/session/route.ts`~~ - **Removed** (session route no longer exists)
 2. `TASK-2.4-INTEGRATION-SUMMARY.md` - This summary document

@@ -56,7 +56,7 @@ export default function NavbarClient(): JSX.Element {
    * Check authentication state using AuthCoordinator
    * 
    * This function calls AuthCoordinator.getAuthState() to determine if the user
-   * has a valid JWT token. It updates the component state based on the result.
+   * is authenticated. It updates the component state based on the result.
    * 
    * Requirements: 1.1, 1.2, 1.3, 5.3
    */
@@ -65,8 +65,8 @@ export default function NavbarClient(): JSX.Element {
       const authState = await getAuthState();
       console.log('[NavbarClient] Auth state received:', authState);
       
-      // Use hasJWT to determine authentication (JWT priority)
-      setIsAuthenticated(authState.hasJWT);
+      // Use isAuthenticated to determine authentication status
+      setIsAuthenticated(authState.isAuthenticated);
       setIsLoading(false);
     } catch (error) {
       // On error, default to unauthenticated state

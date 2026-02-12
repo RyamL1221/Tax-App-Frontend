@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearAuth } from '@/lib/auth/AuthCoordinator';
+import { clearToken } from '@/lib/api/tokenManager';
 import { logAuthEvent, createAuthState } from '@/lib/auth/AuthLogger';
 import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
@@ -85,7 +85,7 @@ export function useLogout(): UseLogoutReturn {
     logAuthEvent(
       'Logout initiated',
       'info',
-      createAuthState(true, true, null, null),
+      createAuthState(true, null, null),
       {
         operation: 'logout',
         source: 'useLogout',
@@ -107,15 +107,15 @@ export function useLogout(): UseLogoutReturn {
         throw new Error('Failed to clear session');
       }
       
-      // Clear both JWT token and session using AuthCoordinator
-      // This ensures both authentication mechanisms are synchronized
+      // Clear JWT token
+      // The session is cleared by the /api/auth/logout endpoint above
       // Requirements: 3.5 (debug-form-logout-issue)
-      clearAuth('user-logout');
+      clearToken('user-logout', 'useLogout');
       
       logAuthEvent(
         'Logout completed successfully',
         'info',
-        createAuthState(false, false, null, null),
+        createAuthState(false, null, null),
         {
           operation: 'logout',
           source: 'useLogout',
@@ -140,7 +140,7 @@ export function useLogout(): UseLogoutReturn {
       logAuthEvent(
         'Logout failed',
         'error',
-        createAuthState(false, false, null, null),
+        createAuthState(false, null, null),
         {
           operation: 'logout',
           source: 'useLogout',

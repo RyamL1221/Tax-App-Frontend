@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     logAuthEvent(
       'Server-side logout initiated',
       'info',
-      createAuthState(true, false, null, null),
+      createAuthState(true, null, null),
       {
         operation: 'logout',
         source: 'logout-api-route',
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     logAuthEvent(
       'Server-side session cleared successfully',
       'info',
-      createAuthState(false, false, null, null),
+      createAuthState(false, null, null),
       {
         operation: 'logout',
         source: 'logout-api-route',
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     logAuthEvent(
       'Server-side logout failed',
       'error',
-      createAuthState(false, false, null, null),
+      createAuthState(false, null, null),
       {
         operation: 'logout',
         source: 'logout-api-route',

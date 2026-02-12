@@ -80,7 +80,6 @@ describe('LoginForm - Property-Based Tests (Part 2)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: mockOnSubmit,
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -139,7 +138,6 @@ describe('LoginForm - Property-Based Tests (Part 2)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: mockOnSubmit,
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -194,7 +192,6 @@ describe('LoginForm - Property-Based Tests (Part 2)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -242,7 +239,6 @@ describe('LoginForm - Property-Based Tests (Part 2)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -253,7 +249,7 @@ describe('LoginForm - Property-Based Tests (Part 2)', () => {
 
           try {
             // Property: Submit button must be disabled during submission
-            const submitButton = screen.getByRole('button', { name: /signing in/i });
+            const submitButton = screen.getByRole('button', { name: /logging in/i });
             expect(submitButton).toBeDisabled();
             expect(submitButton).toHaveAttribute('aria-busy', 'true');
 

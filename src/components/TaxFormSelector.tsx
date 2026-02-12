@@ -66,7 +66,7 @@ export function TaxFormSelector({ onFormSelect, className }: TaxFormSelectorProp
       try {
         const authState = await getAuthState();
         console.log('[TaxFormSelector] Auth state:', authState);
-        setIsAuthenticated(authState.hasJWT);
+        setIsAuthenticated(authState.isAuthenticated);
       } catch (error) {
         console.error('[TaxFormSelector] Error checking auth state:', error);
         setIsAuthenticated(false);

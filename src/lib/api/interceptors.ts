@@ -140,10 +140,22 @@ function extractFormDataFromPage(): { formType: string; formData: unknown } | nu
 export async function authResponseInterceptor(response: Response): Promise<Response> {
   // Handle 401 Unauthorized responses
   if (response.status === 401) {
+    // Don't clear tokens for auth endpoints (login, register, forgot-password, reset-password)
+    // A 401 on these endpoints is expected (e.g., wrong credentials) and should NOT
+    // clear an existing JWT token or trigger a redirect.
+    const url = new URL(response.url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    const authEndpoints = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'];
+    const isAuthEndpoint = authEndpoints.some(ep => url.pathname.endsWith(ep));
+    
+    if (isAuthEndpoint) {
+      console.log(`[AuthInterceptor] 401 on auth endpoint ${url.pathname} — not clearing token`);
+      return response;
+    }
+    
+    // For protected endpoints, clear token and redirect
     // Capture auth state BEFORE clearing tokens
     const hadToken = tokenManager.hasToken('auth-interceptor');
     const authStateBefore = createAuthState(
-      false, // We don't have session info in the interceptor
       hadToken,
       null,
       null
@@ -187,7 +199,6 @@ export async function authResponseInterceptor(response: Response): Promise<Respo
     // Capture auth state AFTER clearing tokens
     const authStateAfter = createAuthState(
       false,
-      false, // Token was just cleared
       null,
       null
     );

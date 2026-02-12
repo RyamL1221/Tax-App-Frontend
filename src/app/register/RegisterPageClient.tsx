@@ -50,8 +50,8 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
         const authState = await getAuthState();
         console.log('[RegisterPageClient] Auth state:', authState);
         
-        // If user has JWT token, redirect to dashboard
-        if (authState.hasJWT) {
+        // If user is authenticated, redirect to dashboard
+        if (authState.isAuthenticated) {
           console.log('[RegisterPageClient] User already authenticated, redirecting to dashboard');
           const targetUrl = callbackUrl || '/dashboard';
           router.push(targetUrl);

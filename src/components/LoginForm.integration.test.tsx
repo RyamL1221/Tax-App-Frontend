@@ -93,7 +93,8 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
             email: 'test@example.com',
             password: 'SecurePass123!',
           },
-          expect.any(Function) // Status callback
+          expect.any(Function), // Status callback
+          expect.any(String) // traceId
         );
       });
 
@@ -176,7 +177,8 @@ describe('LoginForm - Integration Tests (Fix Form Submission)', () => {
             email: 'test@example.com',
             password: 'SecurePass123!',
           },
-          expect.any(Function) // Status callback
+          expect.any(Function), // Status callback
+          expect.any(String) // traceId
         );
       });
 

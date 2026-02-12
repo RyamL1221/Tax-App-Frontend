@@ -56,7 +56,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -67,7 +66,7 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
 
           try {
             // Property: Button must be disabled when form is submitting
-            const submitButton = screen.getByRole('button', { name: /signing in/i });
+            const submitButton = screen.getByRole('button', { name: /logging in/i });
             expect(submitButton).toBeDisabled();
 
             // Property: This prevents duplicate submissions since disabled buttons can't be clicked
@@ -106,7 +105,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: testData.isSuccess ? null : testData.errorMessage,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -168,7 +166,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,
@@ -228,10 +225,10 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: false,
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldErrorLocal,
+            status: { state: 'idle', message: '' },
           });
 
           const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -279,7 +276,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: true,
             rateLimitRemainingTime: testData.remainingTime,
             clearFieldError: mockClearFieldError,
@@ -328,7 +324,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: true,
             rateLimitRemainingTime: testData.remainingTime,
             clearFieldError: mockClearFieldError,
@@ -380,7 +375,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: 'Invalid email or password',
             isRateLimited: isRateLimited,
             rateLimitRemainingTime: isRateLimited ? testData.remainingTime : 0,
             clearFieldError: mockClearFieldError,
@@ -429,7 +423,6 @@ describe('LoginForm - Property-Based Tests (Part 3)', () => {
             showPassword: false,
             togglePasswordVisibility: mockTogglePasswordVisibility,
             onSubmit: jest.fn(),
-            authError: null,
             isRateLimited: false, // Rate limit reset after success
             rateLimitRemainingTime: 0,
             clearFieldError: mockClearFieldError,

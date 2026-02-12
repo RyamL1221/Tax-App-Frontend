@@ -204,13 +204,8 @@ it('should store token', async () => {
 });
 ```
 
-### 2. Create API Endpoints (REQUIRED)
-AuthCoordinator expects these endpoints to exist:
-
-- `GET /api/auth/session` - Check session validity
-- `POST /api/auth/refresh` - Refresh JWT from session
-
-These need to be implemented in the backend or mocked for testing.
+### 2. ~~Create API Endpoints~~ (NO LONGER APPLICABLE)
+> **Note (Updated):** The `/api/auth/session` and `/api/auth/refresh` endpoints have been **removed** as part of the JWT-only authentication migration (see `.kiro/specs/fix-post-login-loop/`). The AuthCoordinator no longer makes any HTTP requests during authentication checks — it determines auth state solely from JWT token presence in localStorage. These endpoints no longer exist and must not be recreated.
 
 ### 3. Optional Property-Based Tests
 The spec includes optional property-based tests (marked with *):
@@ -281,7 +276,7 @@ Create integration tests for:
 ## Next Steps
 
 1. **Update Tests** (CRITICAL): Fix all test files to handle async setToken
-2. **Create API Endpoints**: Implement /api/auth/session and /api/auth/refresh
+2. ~~**Create API Endpoints**: Implement /api/auth/session and /api/auth/refresh~~ — **Removed:** These endpoints have been removed as part of the JWT-only authentication migration. Authentication is now determined solely by JWT token presence in localStorage.
 3. **Run Test Suite**: Verify all tests pass after updates
 4. **Manual Testing**: Follow testing checklist above
 5. **Monitor Logs**: In development, verify trace IDs correlate correctly

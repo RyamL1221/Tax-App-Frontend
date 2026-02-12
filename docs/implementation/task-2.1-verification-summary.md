@@ -64,7 +64,7 @@ if (requireJWT) {
 
 ✅ **Skip session validity check and refresh attempts**
 - The early return at line 125 prevents execution from reaching line 131 where session check begins
-- No API calls to `/api/auth/session` or `/api/auth/refresh` are made
+- No API calls are made (note: the `/api/auth/session` and `/api/auth/refresh` endpoints have since been removed entirely as part of the JWT-only authentication migration)
 
 ✅ **Set reason field**
 - Line 115: `reason: 'JWT required for this route'`

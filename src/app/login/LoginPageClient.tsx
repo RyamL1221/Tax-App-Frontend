@@ -15,6 +15,76 @@ import {
 import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 import { getAuthState } from '@/lib/auth/AuthCoordinator';
 
+// --- Redirect Loop Detection ---
+// Tracks redirect count within a time window to detect login↔dashboard loops.
+// If more than MAX_REDIRECTS occur within LOOP_DETECTION_WINDOW ms, we stop
+// auto-redirecting and show the login form instead.
+// Requirements: 2.4
+const LOOP_DETECTION_KEY = 'auth_redirect_count';
+const LOOP_DETECTION_WINDOW = 5000; // 5 seconds
+const MAX_REDIRECTS = 2;
+
+/**
+ * Detect whether a redirect loop is occurring.
+ * Returns true if more than MAX_REDIRECTS have been recorded within the
+ * LOOP_DETECTION_WINDOW, indicating a login↔dashboard redirect cycle.
+ *
+ * Requirements: 2.4
+ */
+function detectRedirectLoop(): boolean {
+  try {
+    const stored = sessionStorage.getItem(LOOP_DETECTION_KEY);
+    if (stored) {
+      const { count, timestamp } = JSON.parse(stored);
+      if (Date.now() - timestamp < LOOP_DETECTION_WINDOW) {
+        return count >= MAX_REDIRECTS;
+      }
+    }
+  } catch {
+    // sessionStorage may be unavailable (e.g., SSR or privacy mode)
+  }
+  return false;
+}
+
+/**
+ * Record that a redirect is about to occur.
+ * Increments the redirect counter within the current time window, or starts
+ * a new window if the previous one has expired.
+ *
+ * Requirements: 2.4
+ */
+function recordRedirect(): void {
+  try {
+    const stored = sessionStorage.getItem(LOOP_DETECTION_KEY);
+    let count = 1;
+    let timestamp = Date.now();
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Date.now() - parsed.timestamp < LOOP_DETECTION_WINDOW) {
+        count = parsed.count + 1;
+        timestamp = parsed.timestamp; // keep original timestamp
+      }
+    }
+    sessionStorage.setItem(LOOP_DETECTION_KEY, JSON.stringify({ count, timestamp }));
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
+
+/**
+ * Clear the redirect loop counter.
+ * Called after explicit credential submission to reset the loop detector.
+ *
+ * Requirements: 2.4
+ */
+function clearRedirectLoopCounter(): void {
+  try {
+    sessionStorage.removeItem(LOOP_DETECTION_KEY);
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
+
 export interface LoginPageClientProps {
   /**
    * URL to redirect to after successful login
@@ -84,15 +154,38 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
           }
         }
         
-        // If user has JWT token and no saved form data, redirect to dashboard
-        if (authState.hasJWT && !hasSavedData) {
-          console.log('[LoginPageClient] User already authenticated, redirecting to dashboard');
-          const targetUrl = callbackUrl || '/dashboard';
-          router.push(targetUrl);
+        // Determine if user arrived via redirect (has returnUrl/callbackUrl or expired flag)
+        const arrivedViaRedirect = !!callbackUrl || !!expired;
+        
+        // Only auto-redirect to dashboard if:
+        // 1. User is authenticated
+        // 2. No saved form data to restore
+        // 3. User navigated to /login organically (no callbackUrl, no expired flag)
+        // 4. No redirect loop detected
+        //
+        // If the user arrived via redirect (e.g., dashboard sent them here because
+        // it thought they were unauthenticated), do NOT auto-redirect back.
+        // This breaks the login↔dashboard redirect cycle.
+        // Requirements: 2.1, 2.3, 2.4, 2.5
+        if (authState.isAuthenticated && !hasSavedData && !arrivedViaRedirect) {
+          // Check for redirect loop before auto-redirecting
+          if (detectRedirectLoop()) {
+            console.warn('[LoginPageClient] Redirect loop detected, stopping auto-redirect and showing login form');
+            setIsCheckingAuth(false);
+            return;
+          }
+          
+          console.log('[LoginPageClient] User already authenticated (organic visit), redirecting to dashboard');
+          recordRedirect();
+          router.push('/dashboard');
           return;
         }
         
-        // User not authenticated or has saved form data, show login form
+        if (authState.isAuthenticated && arrivedViaRedirect) {
+          console.log('[LoginPageClient] User authenticated but arrived via redirect (callbackUrl=%s, expired=%s) — showing login form to prevent redirect loop', callbackUrl, expired);
+        }
+        
+        // User not authenticated, has saved form data, or arrived via redirect — show login form
         setIsCheckingAuth(false);
       } catch (error) {
         console.error('[LoginPageClient] Error checking auth state:', error);
@@ -106,15 +199,15 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
     // Listen for storage events to sync across tabs
     // Requirements: 7.5 (jwt-only-authentication)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'token') {
-        console.log('[LoginPageClient] Token changed in another tab, re-checking auth');
+      if (e.key === 'jwt_token') {
+        console.log('[LoginPageClient] JWT token changed in another tab, re-checking auth');
         checkAuth();
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [router, callbackUrl]);
+  }, [router, callbackUrl, expired]);
 
   /**
    * Clear logout state on mount
@@ -150,6 +243,9 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
    * Requirement 8.3: Restore form data after successful login
    */
   const handleSuccess = (redirectUrl: string) => {
+    // Clear the redirect loop counter after explicit credential submission
+    // Requirements: 2.4
+    clearRedirectLoopCounter();
     // Check if we have saved form data to restore
     if (savedFormInfo) {
       const formType = savedFormInfo.formType;

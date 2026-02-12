@@ -58,33 +58,29 @@ export function FormAuthGuard({
 
         console.log('[FormAuthGuard] Auth state received', {
           isAuthenticated: auth.isAuthenticated,
-          hasJWT: auth.hasJWT,
-          hasSession: auth.hasSession,
           authMethod: auth.authMethod,
           pathname,
         });
 
-        if (auth.isAuthenticated && auth.hasJWT) {
-          // Authentication is valid - user has JWT token
-          console.log('[FormAuthGuard] Authentication valid - JWT token present', {
+        if (auth.isAuthenticated) {
+          // Authentication is valid
+          console.log('[FormAuthGuard] Authentication valid', {
             pathname,
           });
           setAuthState('authenticated');
           return;
         }
 
-        // Authentication is invalid - no JWT token or invalid
-        const reason = auth.reason || 'JWT token required for form access';
+        // Authentication is invalid
+        const reason = auth.reason || 'Authentication required for form access';
         
         console.warn('[FormAuthGuard] Authentication failed - redirecting to login', {
           pathname,
           reason,
-          hasJWT: auth.hasJWT,
-          hasSession: auth.hasSession,
         });
 
         // Clear any invalid tokens
-        if (!auth.hasJWT) {
+        if (!auth.isAuthenticated) {
           try {
             await clearToken('FormAuthGuard');
             console.log('[FormAuthGuard] Cleared invalid token', { pathname });
@@ -146,8 +142,8 @@ export function FormAuthGuard({
     // Listen for storage events to sync across tabs
     // Requirements: 7.5 (jwt-only-authentication)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'token') {
-        console.log('[FormAuthGuard] Token changed in another tab, re-checking auth');
+      if (e.key === 'jwt_token') {
+        console.log('[FormAuthGuard] JWT token changed in another tab, re-checking auth');
         checkAuth();
       }
     };

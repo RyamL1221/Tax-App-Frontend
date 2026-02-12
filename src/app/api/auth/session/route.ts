@@ -1,60 +1,41 @@
-/**
- * Session Check API Route
- * 
- * GET /api/auth/session - Check if user has a valid session
- * 
- * Returns 200 OK if session is valid, 401 Unauthorized if not.
- * Used by AuthCoordinator to check session validity when JWT is missing.
- * 
- * Requirements: 9.3
- */
-
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 /**
  * GET /api/auth/session
  * 
- * Check if the current user has a valid session.
- * This endpoint is used by the AuthCoordinator to verify session validity
- * when JWT token is missing or invalid.
+ * Check if the user has an active session
+ * Returns authentication status
  * 
- * @returns 200 OK with session data if valid, 401 Unauthorized if not
+ * Requirements:
+ * - 8.4: Validate session and handle expiration
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Get session from cookies
-    const session = await getSession();
+    const { getSession } = await import('@/lib/session');
+    const sessionData = await getSession();
 
-    // Check if session exists and has required fields
-    if (!session || !session.userId || !session.email) {
-      return NextResponse.json(
-        { error: 'No valid session' },
-        { status: 401 }
-      );
+    // Check if session is valid and not expired
+    if (sessionData) {
+      return NextResponse.json({
+        authenticated: true,
+        session: {
+          userId: sessionData.userId,
+          email: sessionData.email,
+        },
+      });
     }
 
-    // Check if session is expired
-    if (session.expiresAt && session.expiresAt < Date.now()) {
-      return NextResponse.json(
-        { error: 'Session expired' },
-        { status: 401 }
-      );
-    }
-
-    // Session is valid - return success with session data
+    // No valid session found or session expired
     return NextResponse.json({
-      valid: true,
-      userId: session.userId,
-      email: session.email,
-      expiresAt: session.expiresAt,
-    }, { status: 200 });
-
+      authenticated: false,
+    });
   } catch (error) {
-    console.error('[Session Check] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Session check error:', error);
+    
+    // Return unauthenticated on error
+    return NextResponse.json({
+      authenticated: false,
+    });
   }
 }

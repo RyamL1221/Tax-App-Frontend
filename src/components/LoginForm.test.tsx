@@ -38,7 +38,6 @@ describe('LoginForm', () => {
       showPassword: false,
       togglePasswordVisibility: mockTogglePasswordVisibility,
       onSubmit: mockOnSubmit,
-      authError: null,
       isRateLimited: false,
       rateLimitRemainingTime: 0,
       clearFieldError: mockClearFieldError,
@@ -92,7 +91,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -123,7 +121,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -147,7 +144,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -172,7 +168,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -199,7 +194,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -226,7 +220,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -248,11 +241,10 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: 'Invalid email or password',
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
-      status: { state: 'idle', message: '' },
+        status: { state: 'error', message: 'Invalid email or password' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -277,11 +269,10 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: 'Invalid email or password',
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
-      status: { state: 'idle', message: '' },
+        status: { state: 'error', message: 'Invalid email or password' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -314,11 +305,10 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: 'Unable to connect. Please check your connection and try again',
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
-      status: { state: 'idle', message: '' },
+        status: { state: 'error', message: 'Unable to connect. Please check your connection and try again' },
       });
 
       render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -356,7 +346,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -400,7 +389,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -471,7 +459,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmitWithLogging,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -542,7 +529,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmitWithError,
-        authError: 'Invalid email or password',
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -587,7 +573,6 @@ describe('LoginForm', () => {
         showPassword: true,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -612,7 +597,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: false,
         rateLimitRemainingTime: 0,
         clearFieldError: mockClearFieldError,
@@ -639,7 +623,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: true,
         rateLimitRemainingTime: 45,
         clearFieldError: mockClearFieldError,
@@ -666,7 +649,6 @@ describe('LoginForm', () => {
         showPassword: false,
         togglePasswordVisibility: mockTogglePasswordVisibility,
         onSubmit: mockOnSubmit,
-        authError: null,
         isRateLimited: true,
         rateLimitRemainingTime: 45,
         clearFieldError: mockClearFieldError,
@@ -739,6 +721,209 @@ describe('LoginForm', () => {
     });
   });
 
+  describe('Single Error Display', () => {
+    /**
+     * Feature: fix-duplicate-error-popups, Task 2.3
+     * Property 1: Single Error Display
+     * **Validates: Requirements 1.1, 1.3, 1.5**
+     * Test that exactly one error popup appears for network errors
+     */
+    it('should display exactly one error popup for network errors', () => {
+      // Mock the hook to return a network error via status
+      mockUseLoginForm.mockReturnValue({
+        register: mockRegister,
+        handleSubmit: mockHandleSubmit,
+        errors: {},
+        isSubmitting: false,
+        showPassword: false,
+        togglePasswordVisibility: mockTogglePasswordVisibility,
+        onSubmit: mockOnSubmit,
+        isRateLimited: false,
+        rateLimitRemainingTime: 0,
+        clearFieldError: mockClearFieldError,
+        status: { 
+          state: 'error', 
+          message: 'Unable to connect. Please check your connection and try again' 
+        },
+      });
+
+      render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
+
+      // Query for all alert elements (role="alert")
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have exactly one alert for the network error
+      expect(alerts).toHaveLength(1);
+      
+      // Verify it contains the network error message
+      expect(alerts[0]).toHaveTextContent(/unable to connect/i);
+      
+      // Verify it has the correct ARIA attributes
+      expect(alerts[0]).toHaveAttribute('aria-live', 'assertive');
+      expect(alerts[0]).toHaveAttribute('role', 'alert');
+    });
+
+    /**
+     * Feature: fix-duplicate-error-popups, Task 2.3
+     * Property 1: Single Error Display
+     * **Validates: Requirements 1.1, 1.3, 1.5**
+     * Test that exactly one error popup appears for authentication errors
+     */
+    it('should display exactly one error popup for authentication errors', () => {
+      // Mock the hook to return an authentication error via status
+      mockUseLoginForm.mockReturnValue({
+        register: mockRegister,
+        handleSubmit: mockHandleSubmit,
+        errors: {},
+        isSubmitting: false,
+        showPassword: false,
+        togglePasswordVisibility: mockTogglePasswordVisibility,
+        onSubmit: mockOnSubmit,
+        isRateLimited: false,
+        rateLimitRemainingTime: 0,
+        clearFieldError: mockClearFieldError,
+        status: { 
+          state: 'error', 
+          message: 'Invalid email or password' 
+        },
+      });
+
+      render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
+
+      // Query for all alert elements (role="alert")
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have exactly one alert for the authentication error
+      expect(alerts).toHaveLength(1);
+      
+      // Verify it contains the authentication error message
+      expect(alerts[0]).toHaveTextContent(/invalid email or password/i);
+      
+      // Verify it has the correct ARIA attributes
+      expect(alerts[0]).toHaveAttribute('aria-live', 'assertive');
+      expect(alerts[0]).toHaveAttribute('role', 'alert');
+    });
+
+    /**
+     * Feature: fix-duplicate-error-popups, Task 2.3
+     * Property 1: Single Error Display
+     * **Validates: Requirements 1.1, 1.3, 1.5**
+     * Test that field-specific errors don't count as duplicate general errors
+     */
+    it('should display field errors separately from general errors', () => {
+      // Mock the hook to return both a general error and field-specific errors
+      mockUseLoginForm.mockReturnValue({
+        register: mockRegister,
+        handleSubmit: mockHandleSubmit,
+        errors: {
+          email: { message: 'Email is required', type: 'required' },
+          password: { message: 'Password is required', type: 'required' },
+        },
+        isSubmitting: false,
+        showPassword: false,
+        togglePasswordVisibility: mockTogglePasswordVisibility,
+        onSubmit: mockOnSubmit,
+        isRateLimited: false,
+        rateLimitRemainingTime: 0,
+        clearFieldError: mockClearFieldError,
+        status: { 
+          state: 'error', 
+          message: 'Please fix the errors below' 
+        },
+      });
+
+      render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
+
+      // Query for all alert elements (role="alert")
+      const alerts = screen.queryAllByRole('alert');
+      
+      // Should have 3 alerts: 1 general + 2 field-specific
+      expect(alerts).toHaveLength(3);
+      
+      // Verify the general error is displayed once
+      const generalError = alerts.find(alert => 
+        alert.textContent?.includes('Please fix the errors below')
+      );
+      expect(generalError).toBeDefined();
+      
+      // Verify field-specific errors are displayed
+      expect(screen.getByText('Email is required')).toBeInTheDocument();
+      expect(screen.getByText('Password is required')).toBeInTheDocument();
+    });
+
+    /**
+     * Feature: fix-duplicate-error-popups, Task 2.3
+     * Property 1: Single Error Display
+     * **Validates: Requirements 1.1, 1.3, 1.5**
+     * Test that no duplicate error messages appear in the DOM
+     */
+    it('should not display duplicate error messages in the DOM', () => {
+      const errorMessage = 'Unable to connect. Please check your connection and try again';
+      
+      // Mock the hook to return a network error
+      mockUseLoginForm.mockReturnValue({
+        register: mockRegister,
+        handleSubmit: mockHandleSubmit,
+        errors: {},
+        isSubmitting: false,
+        showPassword: false,
+        togglePasswordVisibility: mockTogglePasswordVisibility,
+        onSubmit: mockOnSubmit,
+        isRateLimited: false,
+        rateLimitRemainingTime: 0,
+        clearFieldError: mockClearFieldError,
+        status: { 
+          state: 'error', 
+          message: errorMessage 
+        },
+      });
+
+      const { container } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
+
+      // Count how many times the error message appears in the DOM
+      const allText = container.textContent || '';
+      const occurrences = (allText.match(new RegExp(errorMessage, 'g')) || []).length;
+      
+      // Should appear exactly once
+      expect(occurrences).toBe(1);
+    });
+
+    /**
+     * Feature: fix-duplicate-error-popups, Task 2.3
+     * Property 1: Single Error Display
+     * **Validates: Requirements 1.1, 1.3, 1.5**
+     * Test that only status-based errors are displayed
+     */
+    it('should only display errors through status state', () => {
+      // Mock the hook with status error
+      mockUseLoginForm.mockReturnValue({
+        register: mockRegister,
+        handleSubmit: mockHandleSubmit,
+        errors: {},
+        isSubmitting: false,
+        showPassword: false,
+        togglePasswordVisibility: mockTogglePasswordVisibility,
+        onSubmit: mockOnSubmit,
+        isRateLimited: false,
+        rateLimitRemainingTime: 0,
+        clearFieldError: mockClearFieldError,
+        status: { 
+          state: 'error', 
+          message: 'Something went wrong' 
+        },
+      });
+
+      render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
+
+      // Should have exactly one alert
+      const alerts = screen.queryAllByRole('alert');
+      expect(alerts).toHaveLength(1);
+      
+      // Verify it's the status error
+      expect(alerts[0]).toHaveTextContent('Something went wrong');
+    });
+  });
+
   describe('Property-Based Tests', () => {
     // Feature: login-page, Property 11: Error messages are accessible
     // **Validates: Requirements 5.2, 5.3**
@@ -761,8 +946,8 @@ describe('LoginForm', () => {
               'Password must be at least 8 characters',
               'Password is too long'
             ),
-            hasAuthError: fc.boolean(),
-            authErrorMessage: fc.constantFrom(
+            hasStatusError: fc.boolean(),
+            statusErrorMessage: fc.constantFrom(
               'Invalid email or password',
               'Unable to connect. Please check your connection and try again',
               'Something went wrong. Please try again later'
@@ -785,11 +970,12 @@ describe('LoginForm', () => {
               showPassword: false,
               togglePasswordVisibility: mockTogglePasswordVisibility,
               onSubmit: mockOnSubmit,
-              authError: errorState.hasAuthError ? errorState.authErrorMessage : null,
               isRateLimited: false,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
-            status: { state: 'idle', message: '' },
+              status: errorState.hasStatusError 
+                ? { state: 'error', message: errorState.statusErrorMessage }
+                : { state: 'idle', message: '' },
             });
             
             const { unmount } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -850,8 +1036,8 @@ describe('LoginForm', () => {
                 expect(passwordInput).toHaveAttribute('aria-invalid', 'false');
               }
               
-              // Property: General authentication errors should be announced via aria-live="assertive"
-              if (errorState.hasAuthError) {
+              // Property: General status errors should be announced via aria-live="assertive"
+              if (errorState.hasStatusError) {
                 const errorAlerts = screen.getAllByRole('alert');
                 
                 // Find the general error alert (not field-specific errors)
@@ -861,7 +1047,7 @@ describe('LoginForm', () => {
                 );
                 
                 expect(generalErrorAlert).toBeDefined();
-                expect(generalErrorAlert).toHaveTextContent(errorState.authErrorMessage);
+                expect(generalErrorAlert).toHaveTextContent(errorState.statusErrorMessage);
                 
                 // Must be announced assertively (higher priority than field errors)
                 expect(generalErrorAlert).toHaveAttribute('aria-live', 'assertive');
@@ -905,7 +1091,6 @@ describe('LoginForm', () => {
               showPassword: formState.showPassword,
               togglePasswordVisibility: mockTogglePasswordVisibility,
               onSubmit: mockOnSubmit,
-              authError: null,
               isRateLimited: formState.isRateLimited,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
@@ -1046,7 +1231,6 @@ describe('LoginForm', () => {
               showPassword: false,
               togglePasswordVisibility: mockTogglePasswordVisibility,
               onSubmit: mockOnSubmitHandler,
-              authError: null,
               isRateLimited: false,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
@@ -1116,11 +1300,10 @@ describe('LoginForm', () => {
               showPassword: false,
               togglePasswordVisibility: mockTogglePasswordVisibility,
               onSubmit: mockOnSubmit,
-              authError: errorMessage,
               isRateLimited: false,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,
-            status: { state: 'idle', message: '' },
+              status: { state: 'error', message: errorMessage },
             });
             
             const { unmount, container } = render(<LoginForm onSuccess={mockOnSuccess} onError={mockOnError} />);
@@ -1180,7 +1363,6 @@ describe('LoginForm', () => {
               showPassword: formState.showPassword,
               togglePasswordVisibility: mockTogglePasswordVisibility,
               onSubmit: mockOnSubmit,
-              authError: null,
               isRateLimited: formState.isRateLimited,
               rateLimitRemainingTime: 0,
               clearFieldError: mockClearFieldError,

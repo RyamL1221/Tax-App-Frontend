@@ -53,18 +53,6 @@ else
 fi
 echo ""
 
-# Test 4: Authenticated request (session check)
-echo "🔑 Test 4: Authenticated Request"
-echo "GET http://127.0.0.1:3000/auth/session"
-SESSION_RESPONSE=$(curl -s http://127.0.0.1:3000/auth/session \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json")
-echo "Response: $SESSION_RESPONSE"
-if [[ $SESSION_RESPONSE == *"email"* ]]; then
-  echo "✅ Success: Authenticated request working"
-else
-  echo "⚠️  Session check response received"
-fi
 echo ""
 
 echo "🎉 API tests completed!"

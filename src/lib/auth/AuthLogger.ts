@@ -17,12 +17,30 @@ import { logoutStateManager } from './LogoutStateManager';
 
 /**
  * Authentication state interface
+ * 
+ * Simplified to contain only essential fields. Authentication status
+ * is determined directly from JWT token presence, not derived from
+ * other fields.
+ * 
+ * Requirements: 1.1, 1.2, 1.3, 1.4
  */
 export interface AuthState {
-  hasSession: boolean;
-  hasJWT: boolean;
+  /**
+   * Whether the user is authenticated
+   * Determined by JWT token presence and validity
+   */
   isAuthenticated: boolean;
+  
+  /**
+   * User ID extracted from JWT token
+   * null if not authenticated
+   */
   userId: string | null;
+  
+  /**
+   * User email extracted from JWT token
+   * null if not authenticated
+   */
   email: string | null;
 }
 
@@ -126,8 +144,6 @@ export function logAuthStateChange(
       ...context,
       oldState,
       changes: {
-        hasSession: oldState.hasSession !== newState.hasSession,
-        hasJWT: oldState.hasJWT !== newState.hasJWT,
         isAuthenticated: oldState.isAuthenticated !== newState.isAuthenticated,
       },
     },
@@ -269,19 +285,23 @@ export function logAuthEvent(
 }
 
 /**
- * Create a minimal auth state object for logging
+ * Create a simplified auth state object for logging
  * Helper function to create auth state from available information
+ * 
+ * @param isAuthenticated - Whether the user is authenticated
+ * @param userId - User ID (optional)
+ * @param email - User email (optional)
+ * @returns AuthState object
+ * 
+ * Requirements: 6.1, 4.2
  */
 export function createAuthState(
-  hasSession: boolean,
-  hasJWT: boolean,
+  isAuthenticated: boolean,
   userId: string | null = null,
   email: string | null = null
 ): AuthState {
   return {
-    hasSession,
-    hasJWT,
-    isAuthenticated: hasSession && hasJWT,
+    isAuthenticated,
     userId,
     email,
   };
@@ -340,12 +360,11 @@ export class AuthLogger {
   }
 
   createAuthState(
-    hasSession: boolean,
-    hasJWT: boolean,
+    isAuthenticated: boolean,
     userId: string | null = null,
     email: string | null = null
   ): AuthState {
-    return createAuthState(hasSession, hasJWT, userId, email);
+    return createAuthState(isAuthenticated, userId, email);
   }
 }
 

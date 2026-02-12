@@ -160,7 +160,7 @@ export async function createSession(userId: string, email: string): Promise<stri
     logAuthEvent(
       'Session created successfully',
       'info',
-      createAuthState(true, false, userId, email),
+      createAuthState(true, userId, email),
       {
         operation: 'createSession',
         userId,
@@ -175,7 +175,7 @@ export async function createSession(userId: string, email: string): Promise<stri
     logAuthEvent(
       'Session creation failed',
       'error',
-      createAuthState(false, false, userId, email),
+      createAuthState(false, userId, email),
       {
         operation: 'createSession',
         userId,
@@ -202,7 +202,7 @@ export async function getSession(): Promise<SessionData | null> {
       logAuthEvent(
         'Session cookie not found',
         'debug',
-        createAuthState(false, false),
+        createAuthState(false),
         {
           operation: 'getSession',
           reason: 'No session cookie present',
@@ -218,7 +218,7 @@ export async function getSession(): Promise<SessionData | null> {
       logAuthEvent(
         'Session validation failed',
         'warn',
-        createAuthState(false, false),
+        createAuthState(false),
         {
           operation: 'getSession',
           reason: 'Session token invalid or expired',
@@ -231,7 +231,7 @@ export async function getSession(): Promise<SessionData | null> {
     logAuthEvent(
       'Session retrieved successfully',
       'debug',
-      createAuthState(true, false, sessionData.userId, sessionData.email),
+      createAuthState(true, sessionData.userId, sessionData.email),
       {
         operation: 'getSession',
         userId: sessionData.userId,
@@ -246,7 +246,7 @@ export async function getSession(): Promise<SessionData | null> {
     logAuthEvent(
       'Session retrieval error',
       'error',
-      createAuthState(false, false),
+      createAuthState(false),
       {
         operation: 'getSession',
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -272,7 +272,7 @@ export async function clearSession(): Promise<void> {
     logAuthEvent(
       'Session cleared successfully',
       'info',
-      createAuthState(false, false, sessionData?.userId || null, sessionData?.email || null),
+      createAuthState(false, sessionData?.userId || null, sessionData?.email || null),
       {
         operation: 'clearSession',
         hadSession: sessionData !== null,
@@ -285,7 +285,7 @@ export async function clearSession(): Promise<void> {
     logAuthEvent(
       'Session clearing error',
       'error',
-      createAuthState(false, false),
+      createAuthState(false),
       {
         operation: 'clearSession',
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -309,7 +309,7 @@ export async function validateAndRefreshSession(): Promise<boolean> {
       logAuthEvent(
         'Session validation failed - no valid session',
         'debug',
-        createAuthState(false, false),
+        createAuthState(false),
         {
           operation: 'validateAndRefreshSession',
           result: false,
@@ -331,7 +331,7 @@ export async function validateAndRefreshSession(): Promise<boolean> {
       logAuthEvent(
         'Session refreshed due to approaching expiration',
         'info',
-        createAuthState(true, false, sessionData.userId, sessionData.email),
+        createAuthState(true, sessionData.userId, sessionData.email),
         {
           operation: 'validateAndRefreshSession',
           timeUntilExpiry,
@@ -343,7 +343,7 @@ export async function validateAndRefreshSession(): Promise<boolean> {
       logAuthEvent(
         'Session validated successfully',
         'debug',
-        createAuthState(true, false, sessionData.userId, sessionData.email),
+        createAuthState(true, sessionData.userId, sessionData.email),
         {
           operation: 'validateAndRefreshSession',
           result: true,
@@ -358,7 +358,7 @@ export async function validateAndRefreshSession(): Promise<boolean> {
     logAuthEvent(
       'Session validation error',
       'error',
-      createAuthState(false, false),
+      createAuthState(false),
       {
         operation: 'validateAndRefreshSession',
         error: error instanceof Error ? error.message : 'Unknown error',

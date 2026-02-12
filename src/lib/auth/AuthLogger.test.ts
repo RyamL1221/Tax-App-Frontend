@@ -49,33 +49,29 @@ describe('AuthLogger', () => {
 
   describe('createAuthState', () => {
     it('should create auth state with all fields', () => {
-      const state = createAuthState(true, true, 'user123', 'user@example.com');
+      const state = createAuthState(true, 'user123', 'user@example.com');
       
       expect(state).toEqual({
-        hasSession: true,
-        hasJWT: true,
         isAuthenticated: true,
         userId: 'user123',
         email: 'user@example.com',
       });
     });
 
-    it('should set isAuthenticated to true only when both session and JWT exist', () => {
-      expect(createAuthState(true, true).isAuthenticated).toBe(true);
-      expect(createAuthState(true, false).isAuthenticated).toBe(false);
-      expect(createAuthState(false, true).isAuthenticated).toBe(false);
-      expect(createAuthState(false, false).isAuthenticated).toBe(false);
+    it('should set isAuthenticated based on parameter', () => {
+      expect(createAuthState(true).isAuthenticated).toBe(true);
+      expect(createAuthState(false).isAuthenticated).toBe(false);
     });
 
     it('should handle null userId and email', () => {
-      const state = createAuthState(true, true, null, null);
+      const state = createAuthState(true, null, null);
       
       expect(state.userId).toBeNull();
       expect(state.email).toBeNull();
     });
 
     it('should default userId and email to null when not provided', () => {
-      const state = createAuthState(true, true);
+      const state = createAuthState(true);
       
       expect(state.userId).toBeNull();
       expect(state.email).toBeNull();
@@ -86,8 +82,8 @@ describe('AuthLogger', () => {
     it('should log auth state change with all required fields', () => {
       process.env.NODE_ENV = 'development';
       
-      const oldState = createAuthState(false, false);
-      const newState = createAuthState(true, true, 'user123', 'user@example.com');
+      const oldState = createAuthState(false);
+      const newState = createAuthState(true, 'user123', 'user@example.com');
       
       logAuthStateChange('User logged in', oldState, newState);
       
@@ -103,8 +99,6 @@ describe('AuthLogger', () => {
       expect(call[1]).toHaveProperty('authState', newState);
       expect(call[1].context).toHaveProperty('oldState', oldState);
       expect(call[1].context.changes).toEqual({
-        hasSession: true,
-        hasJWT: true,
         isAuthenticated: true,
       });
     });
@@ -112,8 +106,8 @@ describe('AuthLogger', () => {
     it('should include custom context', () => {
       process.env.NODE_ENV = 'development';
       
-      const oldState = createAuthState(true, true);
-      const newState = createAuthState(false, false);
+      const oldState = createAuthState(true);
+      const newState = createAuthState(false);
       const context = { reason: 'session expired', component: 'FormPage' };
       
       logAuthStateChange('User logged out', oldState, newState, context);
@@ -125,15 +119,13 @@ describe('AuthLogger', () => {
     it('should detect changes between states', () => {
       process.env.NODE_ENV = 'development';
       
-      const oldState = createAuthState(true, false);
-      const newState = createAuthState(true, true);
+      const oldState = createAuthState(false);
+      const newState = createAuthState(true);
       
       logAuthStateChange('JWT recovered', oldState, newState);
       
       const call = consoleLogSpy.mock.calls[0];
       expect(call[1].context.changes).toEqual({
-        hasSession: false,
-        hasJWT: true,
         isAuthenticated: true,
       });
     });
@@ -141,8 +133,8 @@ describe('AuthLogger', () => {
     it('should log in production mode', () => {
       process.env.NODE_ENV = 'production';
       
-      const oldState = createAuthState(false, false);
-      const newState = createAuthState(true, true);
+      const oldState = createAuthState(false);
+      const newState = createAuthState(true);
       
       logAuthStateChange('User logged in', oldState, newState);
       
@@ -234,7 +226,7 @@ describe('AuthLogger', () => {
     it('should log API auth failure with all details', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(true, false);
+      const authState = createAuthState(false);
       
       logAuthFailure('/api/documents/generate', 401, authState, true);
       
@@ -254,7 +246,7 @@ describe('AuthLogger', () => {
     it('should include custom context', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(false, false);
+      const authState = createAuthState(false);
       const context = { attemptNumber: 2, maxRetries: 3 };
       
       logAuthFailure('/api/test', 401, authState, false, context);
@@ -266,7 +258,7 @@ describe('AuthLogger', () => {
     it('should log warnings in production mode', () => {
       process.env.NODE_ENV = 'production';
       
-      const authState = createAuthState(true, true);
+      const authState = createAuthState(true);
       
       logAuthFailure('/api/test', 401, authState, false);
       
@@ -276,7 +268,7 @@ describe('AuthLogger', () => {
     it('should handle different status codes', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(true, true);
+      const authState = createAuthState(true);
       const statuses = [401, 403, 500];
       
       statuses.forEach(status => {
@@ -294,7 +286,7 @@ describe('AuthLogger', () => {
     it('should log redirect with all details', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(false, false);
+      const authState = createAuthState(false);
       
       logRedirect('/forms/1099-div', '/login', 'Session expired', authState);
       
@@ -314,7 +306,7 @@ describe('AuthLogger', () => {
     it('should include custom context', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(true, false);
+      const authState = createAuthState(false);
       const context = { returnUrl: '/forms/1099-div', preservedData: true };
       
       logRedirect('/forms/1099-div', '/login', 'JWT missing', authState, context);
@@ -326,7 +318,7 @@ describe('AuthLogger', () => {
     it('should not log in production mode (info level)', () => {
       process.env.NODE_ENV = 'production';
       
-      const authState = createAuthState(false, false);
+      const authState = createAuthState(false);
       
       logRedirect('/dashboard', '/login', 'Not authenticated', authState);
       
@@ -366,7 +358,7 @@ describe('AuthLogger', () => {
     it('should include auth state when provided', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(true, true, 'user123', 'user@example.com');
+      const authState = createAuthState(true, 'user123', 'user@example.com');
       
       logAuthEvent('Event with state', 'info', authState);
       
@@ -434,7 +426,7 @@ describe('AuthLogger', () => {
     it('should include full details in development', () => {
       process.env.NODE_ENV = 'development';
       
-      const authState = createAuthState(true, true);
+      const authState = createAuthState(true);
       const context = { test: 'data' };
       
       logAuthEvent('Test event', 'info', authState, context);
@@ -447,7 +439,7 @@ describe('AuthLogger', () => {
     it('should include minimal details in production', () => {
       process.env.NODE_ENV = 'production';
       
-      const authState = createAuthState(true, true);
+      const authState = createAuthState(true);
       const context = { test: 'data' };
       
       logAuthEvent('Test warning', 'warn', authState, context);
@@ -503,8 +495,8 @@ describe('AuthLogger', () => {
       process.env.NODE_ENV = 'development';
       
       const logger = new AuthLogger();
-      const oldState = createAuthState(false, false);
-      const newState = createAuthState(true, true);
+      const oldState = createAuthState(false);
+      const newState = createAuthState(true);
       
       logger.logAuthStateChange('Test', oldState, newState);
       logger.logTokenOperation('set', true);
@@ -518,11 +510,9 @@ describe('AuthLogger', () => {
 
     it('should have createAuthState method', () => {
       const logger = new AuthLogger();
-      const state = logger.createAuthState(true, true, 'user123', 'user@example.com');
+      const state = logger.createAuthState(true, 'user123', 'user@example.com');
       
       expect(state).toEqual({
-        hasSession: true,
-        hasJWT: true,
         isAuthenticated: true,
         userId: 'user123',
         email: 'user@example.com',
@@ -534,8 +524,8 @@ describe('AuthLogger', () => {
     it('should provide authLogger singleton', () => {
       process.env.NODE_ENV = 'development';
       
-      const oldState = createAuthState(false, false);
-      const newState = createAuthState(true, true);
+      const oldState = createAuthState(false);
+      const newState = createAuthState(true);
       
       authLogger.logAuthStateChange('Test', oldState, newState);
       

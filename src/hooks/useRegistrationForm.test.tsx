@@ -836,7 +836,10 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
 
     // Should have email-specific error
     expect(result.current.errors.email).toBe('This email is already registered. Please log in instead.');
-    expect(result.current.errors.general).toBeUndefined();
+    
+    // Should have status message for the error
+    expect(result.current.statusMessage).toBe('Email already exists');
+    expect(result.current.statusType).toBe('error');
 
     // Loading state should be cleared
     expect(mockSetLoading).toHaveBeenCalledWith(false);
@@ -890,8 +893,9 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
       expect(mockSetLoading).toHaveBeenCalledWith(false);
     });
 
-    // Should have general error
-    expect(result.current.errors.general).toBe('An unexpected error occurred. Please try again.');
+    // Should have status message for the error
+    expect(result.current.statusMessage).toBe('An unexpected error occurred. Please try again.');
+    expect(result.current.statusType).toBe('error');
     expect(result.current.errors.email).toBeUndefined();
   });
 
@@ -940,8 +944,9 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
       expect(mockSetLoading).toHaveBeenCalledWith(false);
     });
 
-    // Should have network error message
-    expect(result.current.errors.general).toBe('Network error. Please check your connection and try again.');
+    // Should have status message for network error
+    expect(result.current.statusMessage).toBe('Network error. Please check your connection and try again.');
+    expect(result.current.statusType).toBe('error');
   });
 
   // Test error clearing when user types
@@ -1033,8 +1038,9 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
       expect(mockSetLoading).toHaveBeenCalledWith(false);
     });
 
-    // Verify general error exists
-    expect(result.current.errors.general).toBe('Network error. Please check your connection and try again.');
+    // Verify status message exists for network error
+    expect(result.current.statusMessage).toBe('Network error. Please check your connection and try again.');
+    expect(result.current.statusType).toBe('error');
 
     // Type in any field
     act(() => {
@@ -1043,8 +1049,9 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
       } as any);
     });
 
-    // General error should be cleared
-    expect(result.current.errors.general).toBeUndefined();
+    // Status message should be cleared
+    expect(result.current.statusMessage).toBeNull();
+    expect(result.current.statusType).toBeNull();
   });
 
   // Test partial form with invalid email format
@@ -1187,5 +1194,422 @@ describe('useRegistrationForm Unit Tests - Edge Cases', () => {
 
     // API should not have been called
     expect(mockRegister).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRegistrationForm Unit Tests - Single Error State', () => {
+  const mockSetLoading = jest.fn();
+  const mockRecordAttempt = jest.fn();
+  const mockResetRateLimit = jest.fn();
+  const mockRegister = authService.register as jest.Mock;
+
+  beforeEach(() => {
+    // Reset all mocks
+    jest.clearAllMocks();
+    mockRegister.mockReset();
+    mockSetLoading.mockClear();
+    mockRecordAttempt.mockClear();
+    mockResetRateLimit.mockClear();
+    
+    // Mock useLoadingState
+    (useLoadingState as jest.Mock).mockReturnValue({
+      isLoading: false,
+      setLoading: mockSetLoading,
+    });
+
+    // Mock useRateLimit
+    (useRateLimit as jest.Mock).mockReturnValue({
+      isLocked: false,
+      remainingTime: 0,
+      recordAttempt: mockRecordAttempt,
+      reset: mockResetRateLimit,
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // Test that only statusMessage is set when API errors occur
+  // Requirements: 2.4
+  test('sets only statusMessage when API error occurs (not errors.general)', async () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Fill form with valid data
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'email', value: 'test@example.com' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'password', value: 'Password123!' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'confirmPassword', value: 'Password123!' }
+      } as any);
+    });
+
+    // Mock API error response
+    mockRegister.mockRejectedValueOnce({
+      status: 500,
+      message: 'Internal server error',
+    });
+
+    // Submit form
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: jest.fn(),
+      } as any);
+    });
+
+    // Wait for async operations
+    await waitFor(() => {
+      expect(mockSetLoading).toHaveBeenCalledWith(false);
+    });
+
+    // Should set statusMessage and statusType
+    expect(result.current.statusMessage).toBe('Internal server error');
+    expect(result.current.statusType).toBe('error');
+
+    // Should NOT have errors.general (it doesn't exist in the interface anymore)
+    expect(result.current.errors).not.toHaveProperty('general');
+    
+    // Field-specific errors should be empty
+    expect(result.current.errors.fullName).toBeUndefined();
+    expect(result.current.errors.email).toBeUndefined();
+    expect(result.current.errors.password).toBeUndefined();
+    expect(result.current.errors.confirmPassword).toBeUndefined();
+  });
+
+  // Test that only statusMessage is set when network errors occur
+  // Requirements: 2.4
+  test('sets only statusMessage when network error occurs (not errors.general)', async () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Fill form with valid data
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'email', value: 'test@example.com' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'password', value: 'Password123!' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'confirmPassword', value: 'Password123!' }
+      } as any);
+    });
+
+    // Mock network error (not an ApiError)
+    mockRegister.mockRejectedValueOnce(new Error('Network error'));
+
+    // Submit form
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: jest.fn(),
+      } as any);
+    });
+
+    // Wait for async operations
+    await waitFor(() => {
+      expect(mockSetLoading).toHaveBeenCalledWith(false);
+    });
+
+    // Should set statusMessage and statusType
+    expect(result.current.statusMessage).toBe('Network error. Please check your connection and try again.');
+    expect(result.current.statusType).toBe('error');
+
+    // Should NOT have errors.general
+    expect(result.current.errors).not.toHaveProperty('general');
+    
+    // Field-specific errors should be empty
+    expect(result.current.errors.fullName).toBeUndefined();
+    expect(result.current.errors.email).toBeUndefined();
+    expect(result.current.errors.password).toBeUndefined();
+    expect(result.current.errors.confirmPassword).toBeUndefined();
+  });
+
+  // Test that errors.general is no longer in the return type
+  // Requirements: 2.4
+  test('errors object does not contain general property', () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Verify errors object structure
+    expect(result.current.errors).toBeDefined();
+    expect(result.current.errors).not.toHaveProperty('general');
+    
+    // Verify only valid error properties exist (when empty)
+    const errorKeys = Object.keys(result.current.errors);
+    const validKeys = ['fullName', 'email', 'password', 'confirmPassword'];
+    
+    errorKeys.forEach(key => {
+      expect(validKeys).toContain(key);
+    });
+  });
+
+  // Test that error clearing clears status
+  // Requirements: 2.4
+  test('clears status when user types in any field after error', async () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Fill form with valid data
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'email', value: 'test@example.com' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'password', value: 'Password123!' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'confirmPassword', value: 'Password123!' }
+      } as any);
+    });
+
+    // Mock API error
+    mockRegister.mockRejectedValueOnce({
+      status: 500,
+      message: 'Server error',
+    });
+
+    // Submit form to trigger error
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: jest.fn(),
+      } as any);
+    });
+
+    // Wait for error to be set
+    await waitFor(() => {
+      expect(result.current.statusMessage).toBe('Server error');
+    });
+
+    // Verify error is displayed
+    expect(result.current.statusMessage).toBe('Server error');
+    expect(result.current.statusType).toBe('error');
+
+    // Type in any field (fullName)
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe Updated' }
+      } as any);
+    });
+
+    // Status should be cleared
+    expect(result.current.statusMessage).toBeNull();
+    expect(result.current.statusType).toBeNull();
+  });
+
+  // Test that clearStatus function clears status
+  // Requirements: 2.4
+  test('clearStatus function clears statusMessage and statusType', async () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Fill form with valid data
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'email', value: 'test@example.com' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'password', value: 'Password123!' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'confirmPassword', value: 'Password123!' }
+      } as any);
+    });
+
+    // Mock network error
+    mockRegister.mockRejectedValueOnce(new Error('Network error'));
+
+    // Submit form to trigger error
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: jest.fn(),
+      } as any);
+    });
+
+    // Wait for error to be set
+    await waitFor(() => {
+      expect(result.current.statusMessage).toBeTruthy();
+    });
+
+    // Verify error is displayed
+    expect(result.current.statusMessage).toBe('Network error. Please check your connection and try again.');
+    expect(result.current.statusType).toBe('error');
+
+    // Call clearStatus
+    act(() => {
+      result.current.clearStatus();
+    });
+
+    // Status should be cleared
+    expect(result.current.statusMessage).toBeNull();
+    expect(result.current.statusType).toBeNull();
+  });
+
+  // Test that 409 conflict error sets both statusMessage and field error
+  // Requirements: 2.4
+  test('409 conflict error sets statusMessage and email field error (not errors.general)', async () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Fill form with valid data
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'email', value: 'existing@example.com' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'password', value: 'Password123!' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'confirmPassword', value: 'Password123!' }
+      } as any);
+    });
+
+    // Mock 409 conflict response
+    mockRegister.mockRejectedValueOnce({
+      status: 409,
+      message: 'Email already exists',
+    });
+
+    // Submit form
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: jest.fn(),
+      } as any);
+    });
+
+    // Wait for async operations
+    await waitFor(() => {
+      expect(result.current.errors.email).toBeDefined();
+    });
+
+    // Should set statusMessage and statusType
+    expect(result.current.statusMessage).toBe('Email already exists');
+    expect(result.current.statusType).toBe('error');
+
+    // Should also set field-specific error for email
+    expect(result.current.errors.email).toBe('This email is already registered. Please log in instead.');
+
+    // Should NOT have errors.general
+    expect(result.current.errors).not.toHaveProperty('general');
+  });
+
+  // Test that success message uses statusMessage (not errors.general)
+  // Requirements: 2.4
+  test('success message sets statusMessage with success type (not errors.general)', async () => {
+    const { result } = renderHook(() => useRegistrationForm());
+
+    // Fill form with valid data
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'fullName', value: 'John Doe' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'email', value: 'test@example.com' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'password', value: 'Password123!' }
+      } as any);
+    });
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: 'confirmPassword', value: 'Password123!' }
+      } as any);
+    });
+
+    // Mock successful API response
+    mockRegister.mockResolvedValueOnce({
+      message: 'User registered successfully',
+      email: 'test@example.com',
+    });
+
+    // Submit form
+    await act(async () => {
+      await result.current.handleSubmit({
+        preventDefault: jest.fn(),
+      } as any);
+    });
+
+    // Wait for async operations
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalled();
+    });
+
+    // Should set statusMessage and statusType for success
+    expect(result.current.statusMessage).toBe('User registered successfully');
+    expect(result.current.statusType).toBe('success');
+
+    // Should NOT have errors.general
+    expect(result.current.errors).not.toHaveProperty('general');
+    
+    // No field errors should be present
+    expect(result.current.errors.fullName).toBeUndefined();
+    expect(result.current.errors.email).toBeUndefined();
+    expect(result.current.errors.password).toBeUndefined();
+    expect(result.current.errors.confirmPassword).toBeUndefined();
   });
 });
