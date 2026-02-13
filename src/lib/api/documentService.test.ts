@@ -63,11 +63,15 @@ describe('DocumentService', () => {
 
       const result = await documentService.generateDocument(request);
 
+      // Expect monetary values to be converted to numbers
       expect(mockApiClient.post).toHaveBeenCalledWith(
         '/documents/generate',
         {
           documentType: '1099-DIV',
-          formData: validFormData
+          formData: {
+            ...validFormData,
+            totalOrdinaryDividends: 1000.00
+          }
         }
       );
       expect(result).toEqual(mockResponse);
@@ -157,11 +161,17 @@ describe('DocumentService', () => {
 
       await documentService.generateDocument(request);
 
+      // Expect monetary values to be converted to numbers
       expect(mockApiClient.post).toHaveBeenCalledWith(
         '/documents/generate',
         {
           documentType: '1099-DIV',
-          formData: formDataWithOptionals
+          formData: {
+            ...formDataWithOptionals,
+            totalOrdinaryDividends: 1000.00,
+            qualifiedDividends: 500.00,
+            federalIncomeTaxWithheld: 100.00
+          }
         }
       );
     });
@@ -434,10 +444,10 @@ describe('DocumentService', () => {
         const formDataWithAllMonetary: Form1099DivData = {
           ...validFormData,
           qualifiedDividends: '100.00',
-          totalCapitalGain: '200.00',
-          unrecaptured1250Gain: '50.00',
+          totalCapitalGainDistributions: '200.00',
+          unrecapturedSection1250Gain: '50.00',
           section1202Gain: '75.00',
-          collectiblesGain: '25.00',
+          collectibles28Gain: '25.00',
           section897OrdinaryDividends: '10.00',
           section897CapitalGain: '15.00',
           nondividendDistributions: '30.00',
@@ -448,7 +458,7 @@ describe('DocumentService', () => {
           cashLiquidationDistributions: '500.00',
           noncashLiquidationDistributions: '300.00',
           exemptInterestDividends: '60.00',
-          specifiedPABInterestDividends: '35.00',
+          specifiedPrivateActivityBondInterest: '35.00',
           stateTaxWithheld: '90.00'
         };
 
@@ -459,13 +469,153 @@ describe('DocumentService', () => {
 
         await documentService.generateDocument(request);
 
+        // Expect all monetary values to be converted to numbers
         expect(mockApiClient.post).toHaveBeenCalledWith(
           '/documents/generate',
           {
             documentType: '1099-DIV',
-            formData: formDataWithAllMonetary
+            formData: {
+              ...formDataWithAllMonetary,
+              totalOrdinaryDividends: 1000.00,
+              qualifiedDividends: 100.00,
+              totalCapitalGainDistributions: 200.00,
+              unrecapturedSection1250Gain: 50.00,
+              section1202Gain: 75.00,
+              collectibles28Gain: 25.00,
+              section897OrdinaryDividends: 10.00,
+              section897CapitalGain: 15.00,
+              nondividendDistributions: 30.00,
+              federalIncomeTaxWithheld: 150.00,
+              section199ADividends: 80.00,
+              investmentExpenses: 20.00,
+              foreignTaxPaid: 40.00,
+              cashLiquidationDistributions: 500.00,
+              noncashLiquidationDistributions: 300.00,
+              exemptInterestDividends: 60.00,
+              specifiedPrivateActivityBondInterest: 35.00,
+              stateTaxWithheld: 90.00
+            }
           }
         );
+      });
+    });
+  });
+
+  describe('downloadDocument', () => {
+    const mockJobId = '550e8400-e29b-41d4-a716-446655440000';
+    const mockBlobUrl = 'blob:http://localhost:3000/mock-pdf';
+    const mockToken = 'mock-jwt-token';
+
+    beforeEach(() => {
+      // Mock fetch globally
+      global.fetch = jest.fn();
+      
+      // Mock URL.createObjectURL
+      global.URL.createObjectURL = jest.fn(() => mockBlobUrl);
+      
+      // Mock localStorage
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: jest.fn(() => mockToken),
+          setItem: jest.fn(),
+          removeItem: jest.fn(),
+          clear: jest.fn()
+        },
+        writable: true
+      });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('should download PDF with authentication via proxy', async () => {
+      const mockBlob = new Blob(['PDF content'], { type: 'application/pdf' });
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: jest.fn((name: string) => {
+            if (name === 'Content-Type') return 'application/pdf';
+            if (name === 'Content-Length') return '1024';
+            return null;
+          })
+        },
+        blob: jest.fn().mockResolvedValue(mockBlob)
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await documentService.downloadDocument(mockJobId);
+
+      // Should call fetch with proxy URL and headers
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/proxy/download/${mockJobId}`,
+        expect.objectContaining({
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${mockToken}`,
+            'Accept': 'application/pdf'
+          }
+        })
+      );
+
+      // Should create blob URL
+      expect(global.URL.createObjectURL).toHaveBeenCalledWith(mockBlob);
+      expect(result).toBe(mockBlobUrl);
+    });
+
+    it('should throw error when token is missing', async () => {
+      // Mock localStorage to return null
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: jest.fn(() => null),
+          setItem: jest.fn(),
+          removeItem: jest.fn(),
+          clear: jest.fn()
+        },
+        writable: true
+      });
+
+      await expect(documentService.downloadDocument(mockJobId)).rejects.toEqual({
+        status: 401,
+        message: 'Authentication required. Please log in again.'
+      });
+
+      // Should not call fetch
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should handle download errors', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: {
+          get: jest.fn((name: string) => {
+            if (name === 'Content-Type') return 'application/json';
+            return null;
+          })
+        },
+        text: jest.fn().mockResolvedValue(JSON.stringify({ error: 'Unauthorized' }))
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await expect(documentService.downloadDocument(mockJobId)).rejects.toEqual({
+        status: 401,
+        message: 'Unauthorized'
+      });
+    });
+
+    it('should handle network errors', async () => {
+      const networkError = new TypeError('Failed to fetch');
+      (global.fetch as jest.Mock).mockRejectedValue(networkError);
+
+      await expect(documentService.downloadDocument(mockJobId)).rejects.toEqual({
+        status: 0,
+        message: 'Unable to download PDF. Please check your network connection and try again.'
       });
     });
   });

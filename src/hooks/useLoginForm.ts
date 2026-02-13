@@ -4,8 +4,11 @@ import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@/lib/validation';
-import { LoginFormData, AuthResponse, AuthError } from '@/types/auth';
+import { LoginFormData, AuthError } from '@/types/auth';
 import { useRateLimit } from './useRateLimit';
+import { authService } from '@/lib/api';
+import { LoginStatus } from '@/lib/api/types';
+import { startTrace, getTraceId } from '@/lib/auth/LoginFlowTracer';
 
 /**
  * Options for configuring the useLoginForm hook
@@ -59,12 +62,9 @@ export interface UseLoginFormReturn {
   /**
    * Form submission handler
    */
-  onSubmit: (data: LoginFormData) => Promise<void>;
+  onSubmit: (data: LoginFormData, event?: React.BaseSyntheticEvent) => Promise<void>;
   
-  /**
-   * General authentication error (not field-specific)
-   */
-  authError: string | null;
+
   
   /**
    * Whether rate limit is active
@@ -80,6 +80,11 @@ export interface UseLoginFormReturn {
    * Clear field errors when user starts typing
    */
   clearFieldError: (field: keyof LoginFormData) => void;
+  
+  /**
+   * Current login status for verbose feedback
+   */
+  status: LoginStatus;
 }
 
 /**
@@ -109,7 +114,7 @@ export interface UseLoginFormReturn {
  *   showPassword,
  *   togglePasswordVisibility,
  *   onSubmit,
- *   authError,
+ *   status,
  *   isRateLimited,
  *   rateLimitRemainingTime,
  * } = useLoginForm({
@@ -136,8 +141,8 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
   // Password visibility state
   const [showPassword, setShowPassword] = useState(false);
   
-  // General authentication error (not field-specific)
-  const [authError, setAuthError] = useState<string | null>(null);
+  // Login status state for verbose feedback
+  const [status, setStatus] = useState<LoginStatus>({ state: 'idle', message: '' });
   
   // Rate limiting hook
   const {
@@ -159,24 +164,42 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
    */
   const clearFieldError = useCallback((field: keyof LoginFormData) => {
     clearErrors(field);
-    // Also clear general auth error when user starts typing
-    if (authError) {
-      setAuthError(null);
+    // Also clear status when user starts typing
+    if (status.state !== 'idle') {
+      setStatus({ state: 'idle', message: '' });
     }
-  }, [clearErrors, authError]);
+  }, [clearErrors, status.state]);
   
   /**
    * Form submission handler
    * Handles authentication API call, rate limiting, and error handling
    * 
+   * Enhanced with:
+   * - Trace ID generation for operation correlation
+   * - Token storage verification before redirect
+   * - Comprehensive logging
+   * 
    * Security Note (Requirement 7.2):
    * Password data is NEVER stored in localStorage or sessionStorage.
    * Passwords are only held in memory during form submission and
    * immediately sent to the server via HTTPS.
+   * 
+   * Requirements: 5.1, 5.3, 5.4, 6.1, 10.1, 10.2
    */
-  const onSubmit = useCallback(async (data: LoginFormData) => {
-    // Clear any previous auth errors
-    setAuthError(null);
+  const onSubmit = useCallback(async (data: LoginFormData, event?: React.BaseSyntheticEvent) => {
+    // Defensive: Explicitly prevent default form behavior (Requirements 1.1, 9.1, 9.2)
+    console.log('Form submission started');
+    if (event) {
+      event.preventDefault();
+      console.log('Default behavior prevented');
+    }
+
+    // Generate trace ID for this login flow
+    const traceId = startTrace();
+    console.log('[useLoginForm] Login flow started', { traceId });
+    
+    // Clear any previous status
+    setStatus({ state: 'idle', message: '' });
     
     // Check rate limit before attempting
     if (isRateLimited) {
@@ -184,7 +207,7 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
         type: 'rate_limit',
         message: `Too many attempts. Please wait ${rateLimitRemainingTime} seconds before trying again`,
       };
-      setAuthError(error.message);
+      setStatus({ state: 'error', message: error.message });
       if (onError) {
         onError(error);
       }
@@ -192,52 +215,61 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     }
     
     try {
-      // Call authentication API
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Call authentication API using authService with status callback and trace ID
+      console.log('[useLoginForm] Calling API client login method', { traceId });
+      const result = await authService.login(
+        {
+          email: data.email,
+          password: data.password
         },
-        body: JSON.stringify(data),
-      });
+        (newStatus) => {
+          // Update status state with callback from authService
+          setStatus(newStatus);
+        },
+        traceId // Pass trace ID for correlation
+      );
       
-      // Parse response
-      const result: AuthResponse = await response.json();
-      
-      if (result.success && result.redirectUrl) {
-        // Success - reset rate limit and call success callback
+      // Check if login was successful
+      if (result.success) {
+        // Token is automatically stored and verified by authService
+        console.log('[useLoginForm] Login successful, token stored and verified', { traceId });
         resetRateLimit();
-        if (onSuccess) {
-          onSuccess(result.redirectUrl);
-        }
-      } else if (result.error) {
-        // Authentication failed - record attempt and display error
-        if (result.error.type === 'authentication') {
+        
+        // Wait 500ms to show success message before redirecting (Requirement 7.1, 7.2)
+        setTimeout(() => {
+          console.log('[useLoginForm] Initiating redirect to dashboard', { traceId });
+          if (onSuccess) {
+            onSuccess('/dashboard');
+          }
+        }, 500);
+      } else {
+        // Login failed - handle error
+        console.error('[useLoginForm] Login failed', { error: result.error, traceId });
+        
+        // Record attempt for authentication errors
+        if (result.error === 'Invalid email or password') {
           recordAttempt();
         }
         
-        setAuthError(result.error.message);
+        // Status is already set by the callback
         if (onError) {
-          onError(result.error);
-        }
-      } else {
-        // Unexpected response format
-        const error: AuthError = {
-          type: 'network',
-          message: 'Something went wrong. Please try again later',
-        };
-        setAuthError(error.message);
-        if (onError) {
-          onError(error);
+          onError({
+            type: 'authentication',
+            message: result.error || 'Login failed'
+          });
         }
       }
     } catch (error) {
-      // Network error or other exception
+      // Handle unexpected errors (Requirement 9.5)
+      console.error('[useLoginForm] Unexpected error during login', { 
+        error: error instanceof Error ? error.message : String(error),
+        traceId 
+      });
       const authErrorObj: AuthError = {
         type: 'network',
         message: 'Unable to connect. Please check your connection and try again',
       };
-      setAuthError(authErrorObj.message);
+      setStatus({ state: 'error', message: authErrorObj.message });
       if (onError) {
         onError(authErrorObj);
       }
@@ -259,10 +291,10 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     showPassword,
     togglePasswordVisibility,
     onSubmit,
-    authError,
     isRateLimited,
     rateLimitRemainingTime,
     clearFieldError,
+    status,
   };
 }
 

@@ -19,6 +19,18 @@ jest.mock('@/lib/session', () => ({
   clearSession: jest.fn(),
 }));
 
+// Mock AuthLogger
+jest.mock('@/lib/auth/AuthLogger', () => ({
+  logAuthEvent: jest.fn(),
+  createAuthState: jest.fn((hasSession, hasJWT, userId, email) => ({
+    hasSession,
+    hasJWT,
+    isAuthenticated: hasSession && hasJWT,
+    userId,
+    email,
+  })),
+}));
+
 describe('Logout API Route Handler', () => {
   beforeEach(() => {
     jest.clearAllMocks();

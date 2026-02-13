@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TAX_FORMS } from '@/types/taxForm';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { getAuthState } from '@/lib/auth/AuthCoordinator';
 
 /**
  * Props for the TaxFormSelector component
@@ -33,6 +34,7 @@ export interface TaxFormSelectorProps {
  * - Navigation button with disabled state when no form selected
  * - Integration with Next.js router for navigation
  * - Extensible design - automatically includes new forms from TAX_FORMS array
+ * - JWT authentication verification before navigation
  * 
  * Requirements:
  * - 2.1: Display available tax forms in dropdown/select interface
@@ -40,6 +42,7 @@ export interface TaxFormSelectorProps {
  * - 2.3: Display all available form options when user interacts
  * - 2.4: Display default prompt/placeholder when no form selected
  * - 3.1: Enable navigation to form's filling interface when form selected
+ * - 3.2 (jwt-only-authentication): Verify JWT token presence before allowing form access
  * 
  * @example
  * ```tsx
@@ -50,7 +53,30 @@ export interface TaxFormSelectorProps {
  */
 export function TaxFormSelector({ onFormSelect, className }: TaxFormSelectorProps) {
   const [selectedForm, setSelectedForm] = useState<string>('');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const router = useRouter();
+  
+  /**
+   * Check authentication state on mount
+   * Requirements: 3.2 (jwt-only-authentication)
+   */
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const authState = await getAuthState();
+        console.log('[TaxFormSelector] Auth state:', authState);
+        setIsAuthenticated(authState.isAuthenticated);
+      } catch (error) {
+        console.error('[TaxFormSelector] Error checking auth state:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    }
+    
+    checkAuth();
+  }, []);
   
   /**
    * Handle form selection change
@@ -68,15 +94,44 @@ export function TaxFormSelector({ onFormSelect, className }: TaxFormSelectorProp
   /**
    * Handle navigation button click
    * Routes to the selected form's path using Next.js router
+   * Verifies JWT authentication before navigation
+   * Requirements: 3.2 (jwt-only-authentication)
    */
-  const handleNavigate = () => {
-    if (selectedForm) {
+  const handleNavigate = async () => {
+    if (!selectedForm) {
+      return;
+    }
+    
+    // Verify authentication before navigation
+    if (!isAuthenticated) {
+      console.warn('[TaxFormSelector] Navigation blocked - user not authenticated');
+      // Redirect to login with return URL
       const form = TAX_FORMS.find(f => f.id === selectedForm);
       if (form) {
-        router.push(form.path);
+        const returnUrl = encodeURIComponent(form.path);
+        router.push(`/login?returnUrl=${returnUrl}`);
       }
+      return;
+    }
+    
+    // User is authenticated, proceed with navigation
+    const form = TAX_FORMS.find(f => f.id === selectedForm);
+    if (form) {
+      console.log('[TaxFormSelector] Navigating to form:', form.path);
+      router.push(form.path);
     }
   };
+  
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className={cn('space-y-4', className)}>
+        <div className="text-center text-gray-600">
+          Loading...
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className={cn('space-y-4', className)}>
@@ -103,7 +158,8 @@ export function TaxFormSelector({ onFormSelect, className }: TaxFormSelectorProp
             'focus-visible:ring-blue-500',
             'min-h-[44px] text-base',
             'md:min-h-[40px] md:text-sm',
-            'bg-white'
+            'bg-white',
+            'text-gray-900'
           )}
         >
           <option value="">Select a tax form...</option>
@@ -128,6 +184,13 @@ export function TaxFormSelector({ onFormSelect, className }: TaxFormSelectorProp
       >
         Fill Out Form
       </Button>
+      
+      {/* Authentication Warning (shown if not authenticated) */}
+      {!isAuthenticated && (
+        <div className="text-sm text-amber-600 text-center">
+          You will be redirected to login before accessing the form
+        </div>
+      )}
     </div>
   );
 }

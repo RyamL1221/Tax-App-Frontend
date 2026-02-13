@@ -35,7 +35,6 @@ jest.mock('@/hooks/useLoginForm', () => ({
     showPassword: false,
     togglePasswordVisibility: jest.fn(),
     onSubmit: jest.fn(),
-    authError: null,
     isRateLimited: false,
     rateLimitRemainingTime: 0,
     clearFieldError: jest.fn(),

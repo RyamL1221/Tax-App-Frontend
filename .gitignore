@@ -23,8 +23,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Temporary test files
+test-*.sh
+test-*.js
+test-*.txt
+*.test.tsx.bak
+
 # Local env files
 .env*.local
+.env.local
 
 # Vercel
 .vercel

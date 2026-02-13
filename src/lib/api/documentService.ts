@@ -46,6 +46,9 @@ export class DocumentService {
    * - Monetary values must have exactly 2 decimal places
    * - Calendar year must be a 4-digit number between 1900 and 2100
    * 
+   * Note: Backend expects monetary values as numbers (floats), not strings.
+   * This method converts string monetary values to numbers before sending.
+   * 
    * @param request - Document generation request with documentType and formData
    * @returns Promise resolving to GenerateDocumentResponse with job information
    * @throws ApiError if validation fails or API request fails
@@ -60,12 +63,16 @@ export class DocumentService {
       this.validate1099DivData(formData);
     }
 
+    // Convert monetary string values to numbers for backend compatibility
+    // Backend expects numbers despite documentation stating strings
+    const transformedFormData = this.transformMonetaryValues(formData);
+
     // Make API request (requires authentication)
     return this.apiClient.post<GenerateDocumentResponse>(
       '/documents/generate',
       {
         documentType,
-        formData
+        formData: transformedFormData
       }
     );
   }
@@ -172,10 +179,10 @@ export class DocumentService {
     // Validate optional monetary values
     const optionalMonetaryFields: (keyof Form1099DivData)[] = [
       'qualifiedDividends',
-      'totalCapitalGain',
-      'unrecaptured1250Gain',
+      'totalCapitalGainDistributions',
+      'unrecapturedSection1250Gain',
       'section1202Gain',
-      'collectiblesGain',
+      'collectibles28Gain',
       'section897OrdinaryDividends',
       'section897CapitalGain',
       'nondividendDistributions',
@@ -186,7 +193,7 @@ export class DocumentService {
       'cashLiquidationDistributions',
       'noncashLiquidationDistributions',
       'exemptInterestDividends',
-      'specifiedPABInterestDividends',
+      'specifiedPrivateActivityBondInterest',
       'stateTaxWithheld'
     ];
 
@@ -201,6 +208,222 @@ export class DocumentService {
           };
         }
       }
+    }
+  }
+
+  /**
+   * Transforms monetary string values to numbers for backend compatibility
+   * 
+   * The backend expects monetary values as numbers (floats), not strings,
+   * despite the API documentation stating they should be strings.
+   * This method converts all monetary string fields to numbers.
+   * 
+   * @param formData - The 1099-DIV form data with string monetary values
+   * @returns Form data with monetary values converted to numbers
+   * 
+   * Requirements: Backend compatibility
+   */
+  private transformMonetaryValues(formData: Form1099DivData): any {
+    // Create a copy to avoid mutating the original
+    const transformed: any = { ...formData };
+
+    // List of all monetary fields that need conversion
+    const monetaryFields = [
+      'totalOrdinaryDividends',
+      'qualifiedDividends',
+      'totalCapitalGainDistributions',
+      'unrecapturedSection1250Gain',
+      'section1202Gain',
+      'collectibles28Gain',
+      'section897OrdinaryDividends',
+      'section897CapitalGain',
+      'nondividendDistributions',
+      'federalIncomeTaxWithheld',
+      'section199ADividends',
+      'investmentExpenses',
+      'foreignTaxPaid',
+      'cashLiquidationDistributions',
+      'noncashLiquidationDistributions',
+      'exemptInterestDividends',
+      'specifiedPrivateActivityBondInterest',
+      'stateTaxWithheld',
+      'stateTaxWithheld2'  // Second state tax field
+    ];
+
+    // Convert each monetary field from string to number
+    // Remove empty strings to prevent backend validation errors
+    for (const field of monetaryFields) {
+      const value = transformed[field];
+      if (value === '' || value === null) {
+        // Remove empty/null values - backend doesn't accept them
+        delete transformed[field];
+      } else if (value !== undefined) {
+        // Convert string to number (parseFloat handles decimal values)
+        transformed[field] = parseFloat(value);
+      }
+    }
+
+    return transformed;
+  }
+
+  /**
+   * Downloads a generated PDF document with authentication
+   * 
+   * Fetches the PDF from the backend using the jobId and JWT token.
+   * Uses a Next.js API proxy route to bypass CORS issues.
+   * Returns a blob URL that can be used to display the PDF in an iframe
+   * or trigger a download.
+   * 
+   * Timeout Behavior:
+   * - Client timeout: 35 seconds
+   * - Proxy timeout: 30 seconds
+   * - If the backend takes longer than 30 seconds, the proxy returns 504
+   * - If the entire request takes longer than 35 seconds, client aborts with 504
+   * 
+   * Error Handling:
+   * - 401: Missing or invalid authentication token
+   * - 504: Request timeout (backend or network took too long)
+   * - Other status codes: Forwarded from backend/proxy
+   * 
+   * @param jobId - The job ID for the generated document (UUID)
+   * @returns Promise resolving to a blob URL for the PDF
+   * @throws ApiError if the request fails
+   * 
+   * Requirements: 5.1, 5.2
+   */
+  async downloadDocument(jobId: string): Promise<string> {
+    console.log('[DocumentService] Starting PDF download', { 
+      jobId,
+      timestamp: new Date().toISOString()
+    });
+
+    // Use Next.js API proxy route to bypass CORS issues
+    // The proxy route forwards the request to the backend with authentication
+    const downloadUrl = `/api/proxy/download/${jobId}`;
+
+    // Get the JWT token from storage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
+
+    // Check if token exists
+    if (!token) {
+      console.error('[DocumentService] No JWT token found in localStorage');
+      throw {
+        status: 401,
+        message: 'Authentication required. Please log in again.'
+      };
+    }
+    
+    console.log('[DocumentService] JWT token found, length:', token.length);
+
+    try {
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 second timeout (slightly longer than proxy)
+
+      console.log('[DocumentService] Fetching from proxy', { 
+        downloadUrl,
+        hasAuthHeader: true,
+        timeout: '35s'
+      });
+
+      try {
+        // Fetch the PDF with authentication via proxy
+        const response = await fetch(downloadUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/pdf'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log('[DocumentService] Proxy response received', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('Content-Type'),
+          contentLength: response.headers.get('Content-Length')
+        });
+
+        // Handle errors
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[DocumentService] Error response from proxy', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          });
+          
+          let errorMessage = 'Failed to download document';
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorJson.message || errorMessage;
+          } catch {
+            // If not JSON, use the text as message
+            errorMessage = errorText || errorMessage;
+          }
+
+          throw {
+            status: response.status,
+            message: errorMessage
+          };
+        }
+
+        // Convert response to blob
+        console.log('[DocumentService] Converting response to blob');
+        const blob = await response.blob();
+        console.log('[DocumentService] Blob created', {
+          size: blob.size,
+          type: blob.type
+        });
+        
+        // Create a blob URL
+        const blobUrl = URL.createObjectURL(blob);
+        console.log('[DocumentService] Blob URL created', { 
+          blobUrl,
+          blobSize: blob.size
+        });
+        
+        return blobUrl;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          console.error('[DocumentService] Request timeout after 35 seconds');
+          throw {
+            status: 504,
+            message: 'Request timeout. The PDF download took too long. Please try again.'
+          };
+        }
+        
+        console.error('[DocumentService] Fetch error', {
+          error: fetchError.message || fetchError,
+          name: fetchError.name,
+          stack: fetchError.stack
+        });
+        
+        throw fetchError;
+      }
+    } catch (error: any) {
+      // Handle network errors
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error('[DocumentService] Network error - failed to fetch');
+        throw {
+          status: 0,
+          message: 'Unable to download PDF. Please check your network connection and try again.'
+        };
+      }
+      
+      console.error('[DocumentService] Download failed', {
+        error: error.message || error,
+        status: error.status,
+        stack: error.stack
+      });
+      
+      // Re-throw other errors
+      throw error;
     }
   }
 }

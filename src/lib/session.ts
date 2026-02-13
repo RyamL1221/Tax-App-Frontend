@@ -1,19 +1,34 @@
 /**
  * Session Management Utilities
  * 
+ * **IMPORTANT: These utilities are for SERVER-SIDE API routes only!**
+ * 
+ * Client-side components should use AuthCoordinator.getAuthState() for
+ * authentication checks, which uses JWT tokens as the single source of truth.
+ * 
+ * Session cookies are used exclusively for backend API authentication and
+ * should NOT be checked in client-side code for authentication decisions.
+ * 
  * Provides functions for:
- * - Creating session tokens
- * - Validating session tokens
- * - Managing session expiration
- * - Setting secure HTTP-only cookies
+ * - Creating session tokens (server-side only)
+ * - Validating session tokens (server-side only)
+ * - Managing session expiration (server-side only)
+ * - Setting secure HTTP-only cookies (server-side only)
+ * 
+ * Enhanced with comprehensive logging for debugging authentication issues.
  * 
  * Requirements:
  * - 8.1: Create secure session tokens on successful authentication
  * - 8.2: Store session tokens in HTTP-only cookies
  * - 8.4: Handle session expiration
+ * - 2.1: Log session operations with success/failure status
+ * - 2.6: Log validation results
+ * - 6.3 (jwt-only-authentication): Session utilities for API routes only
+ * - 6.4 (jwt-only-authentication): Not for client-side authentication decisions
  */
 
 import { cookies } from 'next/headers';
+import { logAuthEvent, logTokenOperation, createAuthState } from './auth/AuthLogger';
 
 /**
  * Session configuration
@@ -125,68 +140,230 @@ export function isSessionExpired(token: string): boolean {
 
 /**
  * Create a session by setting an HTTP-only cookie
- * Requirements: 8.1, 8.2
+ * Requirements: 8.1, 8.2, 2.1
  */
 export async function createSession(userId: string, email: string): Promise<string> {
-  const token = generateSessionToken(userId, email);
-  const cookieStore = await cookies();
+  try {
+    const token = generateSessionToken(userId, email);
+    const cookieStore = await cookies();
 
-  // Set HTTP-only, secure, sameSite cookie
-  cookieStore.set(SESSION_CONFIG.COOKIE_NAME, token, {
-    httpOnly: SESSION_CONFIG.HTTP_ONLY,
-    secure: SESSION_CONFIG.SECURE,
-    sameSite: SESSION_CONFIG.SAME_SITE,
-    maxAge: SESSION_CONFIG.MAX_AGE,
-    path: SESSION_CONFIG.PATH,
-  });
+    // Set HTTP-only, secure, sameSite cookie
+    cookieStore.set(SESSION_CONFIG.COOKIE_NAME, token, {
+      httpOnly: SESSION_CONFIG.HTTP_ONLY,
+      secure: SESSION_CONFIG.SECURE,
+      sameSite: SESSION_CONFIG.SAME_SITE,
+      maxAge: SESSION_CONFIG.MAX_AGE,
+      path: SESSION_CONFIG.PATH,
+    });
 
-  return token;
+    // Log successful session creation
+    logAuthEvent(
+      'Session created successfully',
+      'info',
+      createAuthState(true, userId, email),
+      {
+        operation: 'createSession',
+        userId,
+        email,
+        expiresIn: SESSION_CONFIG.MAX_AGE,
+      }
+    );
+
+    return token;
+  } catch (error) {
+    // Log session creation failure
+    logAuthEvent(
+      'Session creation failed',
+      'error',
+      createAuthState(false, userId, email),
+      {
+        operation: 'createSession',
+        userId,
+        email,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    );
+    throw error;
+  }
 }
 
 /**
  * Get the current session from cookies
  * Returns session data if valid, null otherwise
+ * Requirements: 2.1, 2.6
  */
 export async function getSession(): Promise<SessionData | null> {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get(SESSION_CONFIG.COOKIE_NAME);
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(SESSION_CONFIG.COOKIE_NAME);
 
-  if (!sessionCookie?.value) {
+    if (!sessionCookie?.value) {
+      // Log missing session cookie
+      logAuthEvent(
+        'Session cookie not found',
+        'debug',
+        createAuthState(false),
+        {
+          operation: 'getSession',
+          reason: 'No session cookie present',
+        }
+      );
+      return null;
+    }
+
+    const sessionData = validateSessionToken(sessionCookie.value);
+
+    if (!sessionData) {
+      // Log invalid or expired session
+      logAuthEvent(
+        'Session validation failed',
+        'warn',
+        createAuthState(false),
+        {
+          operation: 'getSession',
+          reason: 'Session token invalid or expired',
+        }
+      );
+      return null;
+    }
+
+    // Log successful session retrieval
+    logAuthEvent(
+      'Session retrieved successfully',
+      'debug',
+      createAuthState(true, sessionData.userId, sessionData.email),
+      {
+        operation: 'getSession',
+        userId: sessionData.userId,
+        email: sessionData.email,
+        expiresAt: sessionData.expiresAt,
+      }
+    );
+
+    return sessionData;
+  } catch (error) {
+    // Log session retrieval error
+    logAuthEvent(
+      'Session retrieval error',
+      'error',
+      createAuthState(false),
+      {
+        operation: 'getSession',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    );
     return null;
   }
-
-  return validateSessionToken(sessionCookie.value);
 }
 
 /**
  * Clear the session by deleting the session cookie
- * Requirement: 8.4
+ * Requirements: 8.4, 2.1
  */
 export async function clearSession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_CONFIG.COOKIE_NAME);
+  try {
+    // Get session data before clearing for logging
+    const sessionData = await getSession();
+    
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_CONFIG.COOKIE_NAME);
+
+    // Log successful session clearing
+    logAuthEvent(
+      'Session cleared successfully',
+      'info',
+      createAuthState(false, sessionData?.userId || null, sessionData?.email || null),
+      {
+        operation: 'clearSession',
+        hadSession: sessionData !== null,
+        userId: sessionData?.userId,
+        email: sessionData?.email,
+      }
+    );
+  } catch (error) {
+    // Log session clearing error
+    logAuthEvent(
+      'Session clearing error',
+      'error',
+      createAuthState(false),
+      {
+        operation: 'clearSession',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    );
+    throw error;
+  }
 }
 
 /**
  * Validate and refresh a session if it's close to expiring
  * Returns true if session is valid, false otherwise
+ * Requirements: 2.6
  */
 export async function validateAndRefreshSession(): Promise<boolean> {
-  const sessionData = await getSession();
+  try {
+    const sessionData = await getSession();
 
-  if (!sessionData) {
+    if (!sessionData) {
+      // Log validation failure
+      logAuthEvent(
+        'Session validation failed - no valid session',
+        'debug',
+        createAuthState(false),
+        {
+          operation: 'validateAndRefreshSession',
+          result: false,
+        }
+      );
+      return false;
+    }
+
+    // Check if session is close to expiring (within 1 day)
+    const now = Date.now();
+    const timeUntilExpiry = sessionData.expiresAt - now;
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+
+    if (timeUntilExpiry < oneDayInMs) {
+      // Refresh the session
+      await createSession(sessionData.userId, sessionData.email);
+      
+      // Log session refresh
+      logAuthEvent(
+        'Session refreshed due to approaching expiration',
+        'info',
+        createAuthState(true, sessionData.userId, sessionData.email),
+        {
+          operation: 'validateAndRefreshSession',
+          timeUntilExpiry,
+          refreshThreshold: oneDayInMs,
+        }
+      );
+    } else {
+      // Log successful validation without refresh
+      logAuthEvent(
+        'Session validated successfully',
+        'debug',
+        createAuthState(true, sessionData.userId, sessionData.email),
+        {
+          operation: 'validateAndRefreshSession',
+          result: true,
+          timeUntilExpiry,
+        }
+      );
+    }
+
+    return true;
+  } catch (error) {
+    // Log validation error
+    logAuthEvent(
+      'Session validation error',
+      'error',
+      createAuthState(false),
+      {
+        operation: 'validateAndRefreshSession',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    );
     return false;
   }
-
-  // Check if session is close to expiring (within 1 day)
-  const now = Date.now();
-  const timeUntilExpiry = sessionData.expiresAt - now;
-  const oneDayInMs = 24 * 60 * 60 * 1000;
-
-  if (timeUntilExpiry < oneDayInMs) {
-    // Refresh the session
-    await createSession(sessionData.userId, sessionData.email);
-  }
-
-  return true;
 }

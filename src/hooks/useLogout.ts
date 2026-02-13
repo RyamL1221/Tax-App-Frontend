@@ -2,6 +2,9 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { clearToken } from '@/lib/api/tokenManager';
+import { logAuthEvent, createAuthState } from '@/lib/auth/AuthLogger';
+import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
 /**
  * Return type for the useLogout hook
@@ -28,10 +31,12 @@ export interface UseLogoutReturn {
  * 
  * Handles the complete logout flow including:
  * - Loading state management
- * - API request to /api/auth/logout
+ * - Clearing both JWT token and session via AuthCoordinator
+ * - Calling server-side logout API to clear session cookie
  * - Success handling with redirect to /login
  * - Error handling with user-friendly messages
  * - Auto-clearing errors after 3 seconds
+ * - Comprehensive logging for debugging
  * 
  * @returns Object containing logout state and handler function
  * 
@@ -57,26 +62,40 @@ export function useLogout(): UseLogoutReturn {
   /**
    * Handle logout process
    * 
-   * Sends POST request to /api/auth/logout endpoint.
-   * On success: redirects to /login page
-   * On error: displays error message for 3 seconds then clears it
+   * Uses AuthCoordinator to clear both JWT token and session cookie,
+   * ensuring both authentication mechanisms are synchronized.
    * 
    * Requirements:
-   * - 3.1: Sends POST request to logout API
-   * - 3.2: Displays loading state during request
-   * - 3.3: Redirects to /login on success
-   * - 5.1: Displays network error messages
-   * - 5.2: Displays server error messages
-   * - 5.3: Re-enables button after error
-   * - 5.4: Auto-clears error after 3 seconds
+   * - 3.5 (debug-form-logout-issue): Uses AuthCoordinator.clearAuth() to clear both session and JWT
+   * - Calls /api/auth/logout to clear server-side session
+   * - Redirects to /login on success
+   * - Displays loading state during process
+   * - Adds logging for logout auth clearing
    */
   const handleLogout = useCallback(async () => {
     // Clear any previous errors and set loading state
     setError(null);
     setIsLoading(true);
     
+    // Set logout state FIRST, before any other operations
+    // This signals to all components that logout is in progress
+    // Requirements: 2.1, 2.5
+    logoutStateManager.setLogoutInProgress();
+    
+    logAuthEvent(
+      'Logout initiated',
+      'info',
+      createAuthState(true, null, null),
+      {
+        operation: 'logout',
+        source: 'useLogout',
+        logoutInProgress: true,
+      }
+    );
+    
     try {
-      // Send POST request to logout API
+      // Call server-side logout API to clear session cookie
+      // This must happen before clearing client-side JWT to ensure proper coordination
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         headers: {
@@ -84,29 +103,50 @@ export function useLogout(): UseLogoutReturn {
         },
       });
       
-      // Parse response
-      const result = await response.json();
-      
-      if (result.success) {
-        // Success - redirect to login page
-        // Keep loading state true until redirect completes
-        router.push('/login');
-      } else {
-        // Server returned error response
-        setIsLoading(false);
-        const errorMessage = result.error?.message || 'Failed to log out. Please try again.';
-        setError(errorMessage);
-        
-        // Auto-clear error after 3 seconds
-        setTimeout(() => {
-          setError(null);
-        }, 3000);
+      if (!response.ok) {
+        throw new Error('Failed to clear session');
       }
+      
+      // Clear JWT token
+      // The session is cleared by the /api/auth/logout endpoint above
+      // Requirements: 3.5 (debug-form-logout-issue)
+      clearToken('user-logout', 'useLogout');
+      
+      logAuthEvent(
+        'Logout completed successfully',
+        'info',
+        createAuthState(false, null, null),
+        {
+          operation: 'logout',
+          source: 'useLogout',
+          sessionCleared: true,
+          jwtCleared: true,
+        }
+      );
+      
+      // Success - redirect to login page
+      // Keep loading state true until redirect completes
+      router.push('/login');
     } catch (err) {
-      // Network error or other exception
+      // Clear logout state on error to allow retry
+      // Requirements: 2.4
+      logoutStateManager.clearLogoutState();
+      
+      // Handle errors gracefully
       setIsLoading(false);
-      const errorMessage = 'Failed to log out. Please check your connection and try again.';
+      const errorMessage = 'Failed to log out. Please try again.';
       setError(errorMessage);
+      
+      logAuthEvent(
+        'Logout failed',
+        'error',
+        createAuthState(false, null, null),
+        {
+          operation: 'logout',
+          source: 'useLogout',
+          error: err instanceof Error ? err.message : 'Unknown error',
+        }
+      );
       
       // Auto-clear error after 3 seconds
       setTimeout(() => {

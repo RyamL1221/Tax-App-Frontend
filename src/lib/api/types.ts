@@ -19,9 +19,31 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  token: string;
-  email: string;
-  userId: string;
+  message?: string;        // Actual backend includes this
+  token: string;           // JWT token (both formats)
+  email: string;           // User email (both formats)
+  userId?: string;         // Documented format includes this, actual doesn't
+}
+
+export interface JWTPayload {
+  userId?: string;
+  email?: string;
+  iat?: number;
+  exp?: number;
+  [key: string]: any;  // Allow other fields
+}
+
+export interface LoginStatus {
+  state: 'idle' | 'authenticating' | 'success' | 'error';
+  message: string;
+}
+
+export interface LoginResult {
+  success: boolean;
+  token?: string;
+  email?: string;
+  userId?: string;
+  error?: string;
 }
 
 export interface ForgotPasswordRequest {
@@ -68,10 +90,10 @@ export interface Form1099DivData {
   
   // Optional dividend fields
   qualifiedDividends?: string;
-  totalCapitalGain?: string;
-  unrecaptured1250Gain?: string;
+  totalCapitalGainDistributions?: string;
+  unrecapturedSection1250Gain?: string;
   section1202Gain?: string;
-  collectiblesGain?: string;
+  collectibles28Gain?: string;
   section897OrdinaryDividends?: string;
   section897CapitalGain?: string;
   nondividendDistributions?: string;
@@ -87,7 +109,7 @@ export interface Form1099DivData {
   cashLiquidationDistributions?: string;
   noncashLiquidationDistributions?: string;
   exemptInterestDividends?: string;
-  specifiedPABInterestDividends?: string;
+  specifiedPrivateActivityBondInterest?: string;
   
   // Optional state tax fields
   stateTaxWithheld?: string;

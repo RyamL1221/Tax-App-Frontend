@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRegistrationForm } from '@/hooks/useRegistrationForm';
 import { EmailInput } from '@/components/ui/EmailInput';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import { PasswordStrengthIndicator } from '@/components/ui/PasswordStrengthIndicator';
 import { PasswordRequirements } from '@/components/ui/PasswordRequirements';
+import { StatusMessage } from '@/components/ui/StatusMessage';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
@@ -59,41 +60,47 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
     handleChange,
     handleBlur,
     handleSubmit,
+    statusMessage,
+    statusType,
+    clearStatus,
   } = useRegistrationForm({ onSuccess });
 
   // Local state for password visibility toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const handlePasswordToggle = useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setShowPassword(prev => !prev);
+  }, []);
+
+  const handleConfirmPasswordToggle = useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setShowConfirmPassword(prev => !prev);
+  }, []);
+
   return (
     <form
       onSubmit={handleSubmit}
+      action="#"
+      method="post"
       className={cn('space-y-6', className)}
       noValidate
+      data-testid="registration-form"
     >
-      {/* General Error Message */}
-      {errors.general && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="p-4 rounded-md bg-red-50 border border-red-200"
-        >
-          <div className="flex items-start">
-            <svg
-              className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <p className="text-sm text-red-800">{errors.general}</p>
-          </div>
-        </div>
+      {/* Status Message */}
+      {statusMessage && statusType && (
+        <StatusMessage
+          message={statusMessage}
+          type={statusType}
+          onClear={clearStatus}
+        />
       )}
 
       {/* Full Name Input */}
@@ -118,7 +125,7 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
           aria-required="true"
           autoComplete="name"
           className={cn(
-            'w-full px-3 py-2 rounded-md border text-base',
+            'w-full px-3 py-2 rounded-md border text-base text-gray-900',
             'transition-colors duration-200',
             'placeholder:text-gray-400',
             'focus:outline-none focus:ring-2 focus:ring-offset-2',
@@ -177,7 +184,7 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
           disabled={isLoading || isRateLimited}
           label="Password"
           showPassword={showPassword}
-          onToggleVisibility={() => setShowPassword(!showPassword)}
+          onToggleVisibility={handlePasswordToggle}
         />
         
         {/* Show strength indicator and requirements when user starts typing */}
@@ -199,7 +206,7 @@ export function RegistrationForm({ onSuccess, className }: RegistrationFormProps
         disabled={isLoading || isRateLimited}
         label="Confirm Password"
         showPassword={showConfirmPassword}
-        onToggleVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
+        onToggleVisibility={handleConfirmPasswordToggle}
       />
 
       {/* Rate Limit Message */}

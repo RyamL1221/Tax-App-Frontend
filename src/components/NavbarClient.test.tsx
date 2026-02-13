@@ -2,291 +2,630 @@
  * Unit tests for NavbarClient component
  * 
  * Tests verify:
- * - Component rendering with null session (unauthenticated)
- * - Component rendering with valid session (authenticated)
+ * - Component rendering with no JWT token (unauthenticated)
+ * - Component rendering with JWT token (authenticated)
  * - Home link present in both states
  * - Link href attributes are correct
  * - Login and Register links only shown when unauthenticated
  * - Dashboard link only shown when authenticated
  * - Keyboard accessibility
+ * - AuthCoordinator integration
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import NavbarClient from './NavbarClient';
-import type { SessionData } from '@/lib/session';
+import * as AuthCoordinator from '@/lib/auth/AuthCoordinator';
+
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
+
+// Mock AuthCoordinator
+jest.mock('@/lib/auth/AuthCoordinator');
+
+// Mock authService
+jest.mock('@/lib/api', () => ({
+  authService: {
+    logout: jest.fn(),
+  },
+}));
+
+import { useRouter } from 'next/navigation';
+
+const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 describe('NavbarClient', () => {
-  const mockSession: SessionData = {
-    userId: 'test-user-123',
-    email: 'test@example.com',
-    createdAt: Date.now() - 1000,
-    expiresAt: Date.now() + 10000,
-  };
+  const mockGetAuthState = AuthCoordinator.getAuthState as jest.MockedFunction<typeof AuthCoordinator.getAuthState>;
+  const mockPush = jest.fn();
 
-  describe('Unauthenticated State (session=null)', () => {
-    it('should render Home link', () => {
-      render(<NavbarClient session={null} />);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    
+    // Mock useRouter
+    mockUseRouter.mockReturnValue({
+      push: mockPush,
+      replace: jest.fn(),
+      refresh: jest.fn(),
+      back: jest.fn(),
+      forward: jest.fn(),
+      prefetch: jest.fn(),
+    } as any);
+  });
 
-      const homeLink = screen.getByRole('link', { name: /home/i });
-      expect(homeLink).toBeInTheDocument();
-      expect(homeLink).toHaveAttribute('href', '/');
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe('Unauthenticated State (no JWT token)', () => {
+    beforeEach(() => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
     });
 
-    it('should render Login link with correct href', () => {
-      render(<NavbarClient session={null} />);
+    it('should render Home link', async () => {
+      render(<NavbarClient />);
 
-      const loginLink = screen.getByRole('link', { name: /login/i });
-      expect(loginLink).toBeInTheDocument();
-      expect(loginLink).toHaveAttribute('href', '/login');
+      await waitFor(() => {
+        const homeLink = screen.getByRole('link', { name: /home/i });
+        expect(homeLink).toBeInTheDocument();
+        expect(homeLink).toHaveAttribute('href', '/');
+      });
     });
 
-    it('should render Register link with correct href', () => {
-      render(<NavbarClient session={null} />);
+    it('should render Login link with correct href', async () => {
+      render(<NavbarClient />);
 
-      const registerLink = screen.getByRole('link', { name: /register/i });
-      expect(registerLink).toBeInTheDocument();
-      expect(registerLink).toHaveAttribute('href', '/register');
+      await waitFor(() => {
+        const loginLink = screen.getByRole('link', { name: /login/i });
+        expect(loginLink).toBeInTheDocument();
+        expect(loginLink).toHaveAttribute('href', '/login');
+      });
     });
 
-    it('should NOT render Dashboard link', () => {
-      render(<NavbarClient session={null} />);
+    it('should render Register link with correct href', async () => {
+      render(<NavbarClient />);
 
-      const dashboardLink = screen.queryByRole('link', { name: /dashboard/i });
-      expect(dashboardLink).not.toBeInTheDocument();
+      await waitFor(() => {
+        const registerLink = screen.getByRole('link', { name: /register/i });
+        expect(registerLink).toBeInTheDocument();
+        expect(registerLink).toHaveAttribute('href', '/register');
+      });
     });
 
-    it('should render exactly 3 links (Home, Login, Register)', () => {
-      render(<NavbarClient session={null} />);
+    it('should NOT render Dashboard link', async () => {
+      render(<NavbarClient />);
 
-      const allLinks = screen.getAllByRole('link');
-      expect(allLinks).toHaveLength(3);
+      await waitFor(() => {
+        const dashboardLink = screen.queryByRole('link', { name: /dashboard/i });
+        expect(dashboardLink).not.toBeInTheDocument();
+      });
+    });
+
+    it('should NOT render LogoutButton', async () => {
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const logoutButton = screen.queryByRole('button', { name: /log out/i });
+        expect(logoutButton).not.toBeInTheDocument();
+      });
+    });
+
+    it('should render exactly 3 links (Home, Login, Register)', async () => {
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const allLinks = screen.getAllByRole('link');
+        expect(allLinks).toHaveLength(3);
+      });
     });
   });
 
-  describe('Authenticated State (valid session)', () => {
-    it('should render Home link', () => {
-      render(<NavbarClient session={mockSession} />);
-
-      const homeLink = screen.getByRole('link', { name: /home/i });
-      expect(homeLink).toBeInTheDocument();
-      expect(homeLink).toHaveAttribute('href', '/');
+  describe('Authenticated State (JWT token present)', () => {
+    beforeEach(() => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
     });
 
-    it('should render Dashboard link with correct href', () => {
-      render(<NavbarClient session={mockSession} />);
+    it('should render Home link', async () => {
+      render(<NavbarClient />);
 
-      const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
-      expect(dashboardLink).toBeInTheDocument();
-      expect(dashboardLink).toHaveAttribute('href', '/dashboard');
+      await waitFor(() => {
+        const homeLink = screen.getByRole('link', { name: /home/i });
+        expect(homeLink).toBeInTheDocument();
+        expect(homeLink).toHaveAttribute('href', '/');
+      });
     });
 
-    it('should NOT render Login link', () => {
-      render(<NavbarClient session={mockSession} />);
+    it('should render Dashboard link with correct href', async () => {
+      render(<NavbarClient />);
 
-      const loginLink = screen.queryByRole('link', { name: /^login$/i });
-      expect(loginLink).not.toBeInTheDocument();
+      await waitFor(() => {
+        const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
+        expect(dashboardLink).toBeInTheDocument();
+        expect(dashboardLink).toHaveAttribute('href', '/dashboard');
+      });
     });
 
-    it('should NOT render Register link', () => {
-      render(<NavbarClient session={mockSession} />);
+    it('should render LogoutButton when authenticated', async () => {
+      render(<NavbarClient />);
 
-      const registerLink = screen.queryByRole('link', { name: /^register$/i });
-      expect(registerLink).not.toBeInTheDocument();
+      await waitFor(() => {
+        const logoutButton = screen.getByRole('button', { name: /log out/i });
+        expect(logoutButton).toBeInTheDocument();
+      });
     });
 
-    it('should render exactly 2 links (Home, Dashboard)', () => {
-      render(<NavbarClient session={mockSession} />);
+    it('should NOT render Login link', async () => {
+      render(<NavbarClient />);
 
-      const allLinks = screen.getAllByRole('link');
-      expect(allLinks).toHaveLength(2);
+      await waitFor(() => {
+        const loginLink = screen.queryByRole('link', { name: /^login$/i });
+        expect(loginLink).not.toBeInTheDocument();
+      });
+    });
+
+    it('should NOT render Register link', async () => {
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const registerLink = screen.queryByRole('link', { name: /^register$/i });
+        expect(registerLink).not.toBeInTheDocument();
+      });
+    });
+
+    it('should render exactly 2 links (Home, Dashboard) and LogoutButton', async () => {
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const allLinks = screen.getAllByRole('link');
+        expect(allLinks).toHaveLength(2);
+        
+        // Verify LogoutButton is present
+        const logoutButton = screen.getByRole('button', { name: /log out/i });
+        expect(logoutButton).toBeInTheDocument();
+      });
     });
   });
 
   describe('Link Attributes', () => {
-    it('should have correct href for Home link', () => {
-      render(<NavbarClient session={null} />);
+    it('should have correct href for Home link', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const homeLink = screen.getByRole('link', { name: /home/i });
-      expect(homeLink).toHaveAttribute('href', '/');
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const homeLink = screen.getByRole('link', { name: /home/i });
+        expect(homeLink).toHaveAttribute('href', '/');
+      });
     });
 
-    it('should have correct href for Login link when unauthenticated', () => {
-      render(<NavbarClient session={null} />);
+    it('should have correct href for Login link when unauthenticated', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const loginLink = screen.getByRole('link', { name: /login/i });
-      expect(loginLink).toHaveAttribute('href', '/login');
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const loginLink = screen.getByRole('link', { name: /login/i });
+        expect(loginLink).toHaveAttribute('href', '/login');
+      });
     });
 
-    it('should have correct href for Register link when unauthenticated', () => {
-      render(<NavbarClient session={null} />);
+    it('should have correct href for Register link when unauthenticated', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const registerLink = screen.getByRole('link', { name: /register/i });
-      expect(registerLink).toHaveAttribute('href', '/register');
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const registerLink = screen.getByRole('link', { name: /register/i });
+        expect(registerLink).toHaveAttribute('href', '/register');
+      });
     });
 
-    it('should have correct href for Dashboard link when authenticated', () => {
-      render(<NavbarClient session={mockSession} />);
+    it('should have correct href for Dashboard link when authenticated', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
 
-      const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
-      expect(dashboardLink).toHaveAttribute('href', '/dashboard');
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
+        expect(dashboardLink).toHaveAttribute('href', '/dashboard');
+      });
     });
   });
 
   describe('Keyboard Accessibility', () => {
-    it('should render all links as anchor elements (unauthenticated)', () => {
-      render(<NavbarClient session={null} />);
+    it('should render all links as anchor elements (unauthenticated)', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const allLinks = screen.getAllByRole('link');
-      allLinks.forEach(link => {
-        expect(link.tagName).toBe('A');
-        expect(link).toHaveAttribute('href');
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const allLinks = screen.getAllByRole('link');
+        allLinks.forEach(link => {
+          expect(link.tagName).toBe('A');
+          expect(link).toHaveAttribute('href');
+        });
       });
     });
 
-    it('should render all links as anchor elements (authenticated)', () => {
-      render(<NavbarClient session={mockSession} />);
+    it('should render all links as anchor elements (authenticated)', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
 
-      const allLinks = screen.getAllByRole('link');
-      allLinks.forEach(link => {
-        expect(link.tagName).toBe('A');
-        expect(link).toHaveAttribute('href');
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        const allLinks = screen.getAllByRole('link');
+        allLinks.forEach(link => {
+          expect(link.tagName).toBe('A');
+          expect(link).toHaveAttribute('href');
+        });
       });
     });
 
-    it('should have proper link role for accessibility', () => {
-      render(<NavbarClient session={null} />);
+    it('should have proper link role for accessibility', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const homeLink = screen.getByRole('link', { name: /home/i });
-      const loginLink = screen.getByRole('link', { name: /login/i });
-      const registerLink = screen.getByRole('link', { name: /register/i });
+      render(<NavbarClient />);
 
-      expect(homeLink).toBeInTheDocument();
-      expect(loginLink).toBeInTheDocument();
-      expect(registerLink).toBeInTheDocument();
+      await waitFor(() => {
+        const homeLink = screen.getByRole('link', { name: /home/i });
+        const loginLink = screen.getByRole('link', { name: /login/i });
+        const registerLink = screen.getByRole('link', { name: /register/i });
+
+        expect(homeLink).toBeInTheDocument();
+        expect(loginLink).toBeInTheDocument();
+        expect(registerLink).toBeInTheDocument();
+      });
     });
   });
 
   describe('Component Structure', () => {
-    it('should render a nav element', () => {
-      const { container } = render(<NavbarClient session={null} />);
+    it('should render a nav element', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const nav = container.querySelector('nav');
-      expect(nav).toBeInTheDocument();
+      const { container } = render(<NavbarClient />);
+
+      await waitFor(() => {
+        const nav = container.querySelector('nav');
+        expect(nav).toBeInTheDocument();
+      });
     });
 
-    it('should have consistent structure for unauthenticated state', () => {
-      const { container } = render(<NavbarClient session={null} />);
+    it('should have consistent structure for unauthenticated state', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      const nav = container.querySelector('nav');
-      expect(nav).toBeInTheDocument();
+      const { container } = render(<NavbarClient />);
 
-      // Should have Home, Login, and Register links
-      const links = screen.getAllByRole('link');
-      expect(links).toHaveLength(3);
+      await waitFor(() => {
+        const nav = container.querySelector('nav');
+        expect(nav).toBeInTheDocument();
+
+        // Should have Home, Login, and Register links
+        const links = screen.getAllByRole('link');
+        expect(links).toHaveLength(3);
+      });
     });
 
-    it('should have consistent structure for authenticated state', () => {
-      const { container } = render(<NavbarClient session={mockSession} />);
+    it('should have consistent structure for authenticated state', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
 
-      const nav = container.querySelector('nav');
-      expect(nav).toBeInTheDocument();
+      const { container } = render(<NavbarClient />);
 
-      // Should have Home and Dashboard links
-      const links = screen.getAllByRole('link');
-      expect(links).toHaveLength(2);
+      await waitFor(() => {
+        const nav = container.querySelector('nav');
+        expect(nav).toBeInTheDocument();
+
+        // Should have Home and Dashboard links
+        const links = screen.getAllByRole('link');
+        expect(links).toHaveLength(2);
+        
+        // Should have LogoutButton
+        const logoutButton = screen.getByRole('button', { name: /log out/i });
+        expect(logoutButton).toBeInTheDocument();
+      });
     });
   });
 
-  describe('Session State Transitions', () => {
-    it('should update from unauthenticated to authenticated', () => {
-      const { rerender } = render(<NavbarClient session={null} />);
+  describe('Authentication State Transitions', () => {
+    it('should update from unauthenticated to authenticated', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
+
+      const { unmount } = render(<NavbarClient />);
 
       // Initial unauthenticated state
-      expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /register/i })).toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /register/i })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
+      });
 
-      // Update to authenticated state
-      rerender(<NavbarClient session={mockSession} />);
+      // Unmount and update mock for authenticated state
+      unmount();
+      
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
 
-      expect(screen.queryByRole('link', { name: /^login$/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: /^register$/i })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
+      // Remount with new auth state
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('link', { name: /^login$/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /^register$/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
+      });
     });
 
-    it('should update from authenticated to unauthenticated', () => {
-      const { rerender } = render(<NavbarClient session={mockSession} />);
+    it('should update from authenticated to unauthenticated', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
+
+      const { unmount } = render(<NavbarClient />);
 
       // Initial authenticated state
-      expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: /login/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: /register/i })).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /login/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /register/i })).not.toBeInTheDocument();
+      });
 
-      // Update to unauthenticated state
-      rerender(<NavbarClient session={null} />);
+      // Unmount and update mock for unauthenticated state
+      unmount();
+      
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
 
-      expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /register/i })).toBeInTheDocument();
+      // Remount with new auth state
+      render(<NavbarClient />);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /log out/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /register/i })).toBeInTheDocument();
+      });
     });
 
-    it('should maintain Home link across state transitions', () => {
-      const { rerender } = render(<NavbarClient session={null} />);
+    it('should maintain Home link across state transitions', async () => {
+      // Test unauthenticated state
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
+
+      const { unmount: unmount1 } = render(<NavbarClient />);
 
       // Home link in unauthenticated state
-      expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
+      });
 
-      // Home link in authenticated state
-      rerender(<NavbarClient session={mockSession} />);
-      expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
+      unmount1();
 
-      // Home link back in unauthenticated state
-      rerender(<NavbarClient session={null} />);
-      expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
+      // Test authenticated state
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
+
+      const { unmount: unmount2 } = render(<NavbarClient />);
+      
+      await waitFor(() => {
+        const homeLinks = screen.getAllByRole('link', { name: /home/i });
+        expect(homeLinks.length).toBeGreaterThanOrEqual(1);
+        expect(homeLinks[0]).toBeInTheDocument();
+      });
+
+      unmount2();
+
+      // Test back to unauthenticated state
+      mockGetAuthState.mockResolvedValue({
+        hasSession: false,
+        hasJWT: false,
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        inFallbackMode: false,
+        authMethod: 'none',
+      });
+
+      render(<NavbarClient />);
+      
+      await waitFor(() => {
+        const homeLinks = screen.getAllByRole('link', { name: /home/i });
+        expect(homeLinks.length).toBeGreaterThanOrEqual(1);
+        expect(homeLinks[0]).toBeInTheDocument();
+      });
     });
   });
 
   describe('Edge Cases', () => {
-    it('should handle session with minimal valid data', () => {
-      const minimalSession: SessionData = {
-        userId: 'u',
-        email: 'a@b.c',
-        createdAt: 0,
-        expiresAt: 1,
-      };
+    it('should handle AuthCoordinator error gracefully', async () => {
+      mockGetAuthState.mockRejectedValue(new Error('Auth check failed'));
 
-      render(<NavbarClient session={minimalSession} />);
+      render(<NavbarClient />);
 
-      expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: /login/i })).not.toBeInTheDocument();
+      // Should default to unauthenticated state on error
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /register/i })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
+      });
     });
 
-    it('should handle session with very long email', () => {
-      const longEmailSession: SessionData = {
-        userId: 'test-user',
-        email: 'very.long.email.address.that.is.quite.lengthy@example.com',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 10000,
-      };
-
-      render(<NavbarClient session={longEmailSession} />);
-
-      expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
-    });
-
-    it('should handle session with special characters in userId', () => {
-      const specialSession: SessionData = {
-        userId: 'user-123_test@special',
+    it('should handle JWT present with session', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: true,
+        isAuthenticated: true,
+        userId: 'test-user-123',
         email: 'test@example.com',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 10000,
-      };
+        inFallbackMode: false,
+        authMethod: 'jwt',
+      });
 
-      render(<NavbarClient session={specialSession} />);
+      render(<NavbarClient />);
 
-      expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should handle fallback mode (no JWT, only session)', async () => {
+      mockGetAuthState.mockResolvedValue({
+        hasSession: true,
+        hasJWT: false,
+        isAuthenticated: true,
+        userId: 'test-user-123',
+        email: 'test@example.com',
+        inFallbackMode: true,
+        authMethod: 'session',
+      });
+
+      render(<NavbarClient />);
+
+      // Should show unauthenticated state when no JWT (JWT priority)
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /login/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /register/i })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
+      });
     });
   });
 });

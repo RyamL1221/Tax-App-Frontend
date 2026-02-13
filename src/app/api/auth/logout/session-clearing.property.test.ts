@@ -22,9 +22,24 @@ const { generateSessionToken, validateSessionToken, SESSION_CONFIG } = actualSes
 type SessionData = typeof actualSession.SessionData;
 
 // Mock the session module - only mock clearSession
-jest.mock('@/lib/session', () => ({
-  ...jest.requireActual('@/lib/session'),
-  clearSession: jest.fn(),
+jest.mock('@/lib/session', () => {
+  const actual = jest.requireActual('@/lib/session');
+  return {
+    ...actual,
+    clearSession: jest.fn().mockResolvedValue(undefined),
+  };
+});
+
+// Mock AuthLogger
+jest.mock('@/lib/auth/AuthLogger', () => ({
+  logAuthEvent: jest.fn(),
+  createAuthState: jest.fn((hasSession, hasJWT, userId, email) => ({
+    hasSession,
+    hasJWT,
+    isAuthenticated: hasSession && hasJWT,
+    userId,
+    email,
+  })),
 }));
 
 // Import the mocked module
@@ -64,14 +79,6 @@ const sessionDataArbitrary = fc.record({
 describe('Property-Based Test: Session Clearing on Logout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
-    // Debug: check if clearSession is a mock
-    console.log('clearSession type:', typeof session.clearSession);
-    console.log('clearSession:', session.clearSession);
-    console.log('Is mock?:', jest.isMockFunction(session.clearSession));
-    
-    // Mock clearSession to succeed
-    (session.clearSession as jest.Mock).mockResolvedValue(undefined);
 
     // Suppress console.error for tests
     jest.spyOn(console, 'error').mockImplementation(() => {});

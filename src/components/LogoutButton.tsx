@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { useLogout } from '@/hooks/useLogout';
+import { authService } from '@/lib/api';
+import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
 /**
  * Props for the LogoutButton component
@@ -18,13 +20,12 @@ export interface LogoutButtonProps {
  * LogoutButton component that triggers the logout process
  * 
  * Displays a button that allows authenticated users to log out of their session.
- * The button shows loading state during logout and handles errors gracefully.
+ * Logout is an instant client-side operation that clears the JWT token and redirects.
  * 
  * Features:
  * - Uses "outline" variant for visual distinction
- * - Shows "Log Out" text in normal state
- * - Shows "Logging out..." text during logout
- * - Disabled during logout process
+ * - Shows "Log Out" text
+ * - Instant logout with no loading state (client-side only)
  * - Accessible via keyboard (Tab, Enter, Space)
  * - Includes ARIA label for screen readers
  * 
@@ -33,11 +34,10 @@ export interface LogoutButtonProps {
  * - 2.3: Uses existing Button component
  * - 2.4: Uses "outline" variant
  * - 2.5: Displays "Log Out" text
- * - 3.2: Shows loading state during logout
- * - 4.1: Becomes disabled when clicked
- * - 4.2: Displays "Logging out..." during logout
- * - 4.3: Shows loading indicator
- * - 4.4: Remains disabled until redirect
+ * - 4.1: Clears JWT token from localStorage
+ * - 4.2: Redirects to login page immediately
+ * - 4.3: No API calls made (client-side only)
+ * - 4.5: Token completely removed from storage
  * - 6.1: Has appropriate ARIA label
  * 
  * @example
@@ -51,29 +51,41 @@ export interface LogoutButtonProps {
  * ```
  */
 export function LogoutButton({ className }: LogoutButtonProps): JSX.Element {
-  const { isLoading, error, handleLogout } = useLogout();
+  const router = useRouter();
+  
+  /**
+   * Handle logout process
+   * 
+   * Sets logout state, clears JWT token from localStorage, and redirects to login page.
+   * This is a synchronous, client-side only operation with no API calls.
+   * 
+   * Requirements:
+   * - 2.1: Sets logout state before any auth operations
+   * - 2.5: Ensures state is set before token clearing
+   * - 4.1: Calls authService.logout() to clear token
+   * - 4.2: Redirects to /login immediately
+   * - 4.3: No API calls made
+   * - 4.5: Token completely removed from localStorage
+   */
+  const handleLogout = () => {
+    // Set logout state FIRST, before any other operations
+    // This prevents race conditions where components try to access auth state
+    // after tokens are cleared but before redirect completes
+    logoutStateManager.setLogoutInProgress();
+    
+    authService.logout();
+    router.push('/login');
+  };
   
   return (
-    <div className={className}>
-      <Button
-        variant="outline"
-        onClick={handleLogout}
-        loading={isLoading}
-        loadingText="Logging out..."
-        aria-label="Log out of your account"
-      >
-        Log Out
-      </Button>
-      {error && (
-        <p 
-          className="text-red-600 text-sm mt-2" 
-          role="alert"
-          aria-live="polite"
-        >
-          {error}
-        </p>
-      )}
-    </div>
+    <Button
+      variant="outline"
+      onClick={handleLogout}
+      aria-label="Log out of your account"
+      className={className}
+    >
+      Log Out
+    </Button>
   );
 }
 

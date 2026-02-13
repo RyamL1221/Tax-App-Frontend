@@ -102,7 +102,7 @@ const EmailInput = React.forwardRef<HTMLInputElement, EmailInputProps>(
           autoComplete="email"
           className={cn(
             // Base styles
-            'w-full px-3 py-2 rounded-md border text-base',
+            'w-full px-3 py-2 rounded-md border text-base text-gray-900',
             'transition-colors duration-200',
             'placeholder:text-gray-400',
             

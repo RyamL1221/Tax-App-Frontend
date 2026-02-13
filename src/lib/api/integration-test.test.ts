@@ -67,30 +67,30 @@ describe('API Client Integration Test (Local Backend)', () => {
     }, 10000);
 
     it('should login with registered credentials', async () => {
-      const response = await authService.login({
+      const result = await authService.login({
         email: testEmail,
         password: testPassword
       });
 
-      expect(response).toBeDefined();
-      expect(response.token).toBeDefined();
-      expect(response.email).toBe(testEmail);
-      expect(response.userId).toBeDefined();
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.token).toBeDefined();
+      expect(result.email).toBe(testEmail);
+      expect(result.userId).toBeDefined();
       
       // Verify token was stored
       expect(tokenManager.hasToken()).toBe(true);
-      expect(tokenManager.getToken()).toBe(response.token);
+      expect(tokenManager.getToken()).toBe(result.token);
     }, 10000);
 
     it('should fail login with incorrect password', async () => {
-      await expect(
-        authService.login({
-          email: testEmail,
-          password: 'WrongPassword123!'
-        })
-      ).rejects.toMatchObject({
-        status: 401
+      const result = await authService.login({
+        email: testEmail,
+        password: 'WrongPassword123!'
       });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid email or password');
     }, 10000);
 
     it('should logout and clear token', () => {
@@ -137,11 +137,12 @@ describe('API Client Integration Test (Local Backend)', () => {
   describe('Request Interceptors', () => {
     it('should add Authorization header for authenticated requests', async () => {
       // Login first to get a token
-      const loginResponse = await authService.login({
+      const loginResult = await authService.login({
         email: testEmail,
         password: testPassword
       });
 
+      expect(loginResult.success).toBe(true);
       expect(tokenManager.hasToken()).toBe(true);
       
       // The token should be automatically included in subsequent requests

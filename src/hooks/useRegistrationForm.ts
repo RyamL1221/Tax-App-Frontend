@@ -9,6 +9,7 @@ import {
   isValidEmail,
   PasswordStrength
 } from '@/utils/passwordValidation';
+import { authService, isApiError } from '@/lib/api';
 
 /**
  * Form data structure for registration
@@ -28,7 +29,6 @@ export interface RegistrationFormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
-  general?: string;
 }
 
 /**
@@ -53,8 +53,11 @@ export interface UseRegistrationFormReturn {
   passwordStrength: PasswordStrength;
   handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
   handleBlur: (e: FocusEvent<HTMLInputElement>) => void;
-  handleSubmit: (e: FormEvent) => Promise<void>;
+  handleSubmit: (e: FormEvent<HTMLFormElement>) => Promise<void>;
   clearError: (field: keyof RegistrationFormErrors) => void;
+  statusMessage: string | null;
+  statusType: 'success' | 'error' | 'info' | null;
+  clearStatus: () => void;
 }
 
 /**
@@ -111,6 +114,10 @@ export function useRegistrationForm(
   // Validation errors state
   const [errors, setErrors] = useState<RegistrationFormErrors>({});
 
+  // Status message state
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusType, setStatusType] = useState<'success' | 'error' | 'info' | null>(null);
+
   // Loading state management
   const { isLoading, setLoading } = useLoadingState();
 
@@ -133,6 +140,15 @@ export function useRegistrationForm(
     : '';
 
   /**
+   * Clear status message
+   * Requirements: 4.2
+   */
+  const clearStatus = useCallback(() => {
+    setStatusMessage(null);
+    setStatusType(null);
+  }, []);
+
+  /**
    * Handle input field changes
    * Updates form data and clears field errors
    * Requirements: 1.1, 9.5
@@ -142,6 +158,9 @@ export function useRegistrationForm(
     
     setFormData(prev => ({ ...prev, [name]: value }));
     
+    // Clear status message when user types
+    clearStatus();
+    
     // Clear error for this field when user starts typing
     if (errors[name as keyof RegistrationFormErrors]) {
       setErrors(prev => {
@@ -150,16 +169,7 @@ export function useRegistrationForm(
         return newErrors;
       });
     }
-    
-    // Also clear general error when user starts typing
-    if (errors.general) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.general;
-        return newErrors;
-      });
-    }
-  }, [errors]);
+  }, [errors, clearStatus]);
 
   /**
    * Validate a single field
@@ -242,18 +252,49 @@ export function useRegistrationForm(
    * Validates all fields, checks rate limit, and calls registration API
    * Requirements: 1.3, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5, 9.1, 9.2, 9.3
    */
-  const handleSubmit = useCallback(async (e: FormEvent) => {
+  const handleSubmit = useCallback(async (e: FormEvent<HTMLFormElement>) => {
+    // CRITICAL: Prevent default FIRST - absolute first line before ANY other logic
+    // This must be synchronous and happen before any console.log or other operations
+    // Requirements: 1.2, 2.1, 2.2, 2.3
     e.preventDefault();
+    
+    // Prevent event bubbling to parent elements (if available)
+    if (typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+    
+    // Synchronous log immediately after preventDefault
+    console.log('✅ preventDefault() called FIRST (stopPropagation also called if available)');
+    
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ========== FORM SUBMISSION STARTED ==========`);
+    console.log(`[${timestamp}] Event defaultPrevented:`, e.defaultPrevented);
+    console.log(`[${timestamp}] Event type:`, e.type);
+    console.log(`[${timestamp}] Event target:`, e.target);
+    console.log(`[${timestamp}] Form data:`, JSON.stringify(formData, null, 2));
+    console.log(`[${timestamp}] Current errors:`, JSON.stringify(errors, null, 2));
+    console.log(`[${timestamp}] Is rate limited:`, isRateLimited);
 
     // Check rate limit
     if (isRateLimited) {
+      console.log(`[${timestamp}] ❌ Form submission blocked: rate limit active`);
       return;
     }
 
     // Validate all fields
-    if (!validateAllFields()) {
+    const isValid = validateAllFields();
+    console.log(`[${timestamp}] Validation result:`, isValid);
+    if (!isValid) {
+      console.log(`[${timestamp}] ❌ Form submission blocked: validation failed`);
+      console.log(`[${timestamp}] Validation errors:`, JSON.stringify(errors, null, 2));
       return;
     }
+    
+    console.log(`[${timestamp}] ✅ Validation passed, proceeding with API call`);
+
+    // Set status to "Creating account..." when submission starts
+    setStatusMessage('Creating account...');
+    setStatusType('info');
 
     // Start loading state
     setLoading(true);
@@ -262,49 +303,56 @@ export function useRegistrationForm(
     recordAttempt();
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          password: formData.password
-        })
+      console.log(`[${timestamp}] 📡 Calling API client register method`);
+      console.log(`[${timestamp}] API payload:`, {
+        email: formData.email,
+        name: formData.fullName,
+        password: '***REDACTED***'
+      });
+      
+      // Use authService instead of fetch
+      const response = await authService.register({
+        email: formData.email,
+        name: formData.fullName,
+        password: formData.password
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-
-        if (response.status === 409) {
+      console.log(`[${timestamp}] ✅ API call successful`);
+      
+      // Set status to API success message
+      setStatusMessage(response.message || 'User registered successfully');
+      setStatusType('success');
+      
+      // Success - reset rate limit and call success callback
+      resetRateLimit();
+      if (onSuccess) {
+        console.log(`[${timestamp}] Calling onSuccess callback`);
+        onSuccess();
+      }
+    } catch (error) {
+      console.log(`[${timestamp}] ❌ API call failed:`, error);
+      // Handle API errors
+      if (isApiError(error)) {
+        // Set status to API error message
+        setStatusMessage(error.message || 'Registration failed. Please try again.');
+        setStatusType('error');
+        
+        if (error.status === 409) {
           // Email already exists
           setErrors(prev => ({
             ...prev,
             email: 'This email is already registered. Please log in instead.'
           }));
-        } else {
-          // Other API errors
-          setErrors(prev => ({
-            ...prev,
-            general: data.message || 'Registration failed. Please try again.'
-          }));
         }
-        return;
+      } else {
+        // Network error - set status to network error message
+        setStatusMessage('Network error. Please check your connection and try again.');
+        setStatusType('error');
       }
-
-      // Success - reset rate limit and call success callback
-      resetRateLimit();
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (error) {
-      // Network error
-      setErrors(prev => ({
-        ...prev,
-        general: 'Network error. Please check your connection and try again.'
-      }));
     } finally {
       // Stop loading state
       setLoading(false);
+      console.log(`[${timestamp}] ========== FORM SUBMISSION ENDED ==========`);
     }
   }, [
     isRateLimited,
@@ -312,6 +360,7 @@ export function useRegistrationForm(
     setLoading,
     recordAttempt,
     formData,
+    errors,
     resetRateLimit,
     onSuccess
   ]);
@@ -340,7 +389,10 @@ export function useRegistrationForm(
     handleChange,
     handleBlur,
     handleSubmit,
-    clearError
+    clearError,
+    statusMessage,
+    statusType,
+    clearStatus
   };
 }
 

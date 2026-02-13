@@ -2,6 +2,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
+import { logoutStateManager } from '@/lib/auth/LogoutStateManager';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,16 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Check if error occurred during logout (Task 9.2)
+    // Requirements: 3.1, 3.2, 3.3
+    const isLogoutError = logoutStateManager.isLogoutInProgress();
+    
+    if (isLogoutError) {
+      // Log but don't show error UI during logout
+      console.info('ErrorBoundary: Error during logout transition (expected)', error);
+      return;
+    }
+    
     // Log the error for monitoring
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
@@ -40,6 +51,20 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render() {
+    // Check if logout is in progress FIRST (Task 9.3)
+    // Requirements: 3.5, 8.1, 8.2, 8.3
+    if (logoutStateManager.isLogoutInProgress()) {
+      // Show logout transition instead of error UI
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="text-gray-600">Logging out...</div>
+          </div>
+        </div>
+      );
+    }
+    
     if (this.state.hasError) {
       // Custom fallback UI
       if (this.props.fallback) {

@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import LoginPageClient from './LoginPageClient';
 
@@ -238,6 +238,84 @@ describe('LoginPageClient - Responsive Layout', () => {
       submitButton.click();
 
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    });
+  });
+
+  describe('Session Expiration Message - Requirement 5.3', () => {
+    test('should display expiration message when expired parameter is true', () => {
+      render(<LoginPageClient expired={true} />);
+
+      const message = screen.getByText(/Your session has expired. Please log in again./i);
+      expect(message).toBeInTheDocument();
+      
+      // Verify it's styled as an informational message (blue)
+      const messageContainer = message.closest('div[role="alert"]');
+      expect(messageContainer).toHaveClass('bg-blue-50', 'border-blue-200');
+    });
+
+    test('should not display expiration message when expired parameter is false', () => {
+      render(<LoginPageClient expired={false} />);
+
+      const message = screen.queryByText(/Your session has expired. Please log in again./i);
+      expect(message).not.toBeInTheDocument();
+    });
+
+    test('should not display expiration message when expired parameter is not provided', () => {
+      render(<LoginPageClient />);
+
+      const message = screen.queryByText(/Your session has expired. Please log in again./i);
+      expect(message).not.toBeInTheDocument();
+    });
+
+    test('should allow dismissing the expiration message', () => {
+      render(<LoginPageClient expired={true} />);
+
+      // Message should be visible initially
+      let message = screen.getByText(/Your session has expired. Please log in again./i);
+      expect(message).toBeInTheDocument();
+
+      // Find and click the dismiss button
+      const dismissButton = screen.getByLabelText('Dismiss message');
+      
+      act(() => {
+        dismissButton.click();
+      });
+
+      // Message should be removed
+      message = screen.queryByText(/Your session has expired. Please log in again./i);
+      expect(message).not.toBeInTheDocument();
+    });
+
+    test('should have proper accessibility attributes', () => {
+      render(<LoginPageClient expired={true} />);
+
+      const messageContainer = screen.getByRole('alert');
+      expect(messageContainer).toBeInTheDocument();
+
+      const dismissButton = screen.getByLabelText('Dismiss message');
+      expect(dismissButton).toHaveAttribute('type', 'button');
+      expect(dismissButton).toHaveAttribute('aria-label', 'Dismiss message');
+    });
+
+    test('should display info icon with expiration message', () => {
+      const { container } = render(<LoginPageClient expired={true} />);
+
+      // Find the alert container
+      const alert = screen.getByRole('alert');
+      
+      // Verify the info icon SVG is present
+      const infoIcon = alert.querySelector('svg.text-blue-400');
+      expect(infoIcon).toBeInTheDocument();
+    });
+
+    test('should display close icon on dismiss button', () => {
+      const { container } = render(<LoginPageClient expired={true} />);
+
+      const dismissButton = screen.getByLabelText('Dismiss message');
+      
+      // Verify the close icon SVG is present
+      const closeIcon = dismissButton.querySelector('svg');
+      expect(closeIcon).toBeInTheDocument();
     });
   });
 });

@@ -14,11 +14,12 @@ export interface NavigationResult {
 }
 
 /**
- * Navigate to the tax preparation start page
+ * Navigate to the registration page to start tax preparation
+ * New users need to register first before accessing tax preparation features
  */
 export const navigateToTaxPreparation = async (options: NavigationOptions = {}): Promise<NavigationResult> => {
   try {
-    const url = '/tax-preparation/start';
+    const url = '/register';
     
     if (options.external) {
       window.open(url, '_blank');

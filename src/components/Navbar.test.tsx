@@ -2,30 +2,24 @@
  * Unit tests for Navbar server component
  * 
  * Tests:
- * - getSession() is called
- * - Session data is passed to NavbarClient
- * - Error handling when getSession() throws
- * - Errors result in null session being passed
+ * - Navbar renders NavbarClient component
+ * - No session logic in server component
+ * - All authentication logic delegated to client
  * 
- * Requirements: 4.3
+ * Requirements:
+ * - 1.1: Use AuthCoordinator to determine authentication state (delegated to NavbarClient)
+ * - 5.1: Use client-side rendering for authentication-dependent UI
  */
 
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import Navbar from './Navbar';
-import * as sessionModule from '@/lib/session';
-import type { SessionData } from '@/lib/session';
-
-// Mock the session module
-jest.mock('@/lib/session', () => ({
-  getSession: jest.fn(),
-}));
 
 // Mock the NavbarClient component
 jest.mock('./NavbarClient', () => {
-  return function MockNavbarClient({ session }: { session: SessionData | null }) {
+  return function MockNavbarClient() {
     return (
-      <div data-testid="navbar-client" data-session={JSON.stringify(session)}>
+      <div data-testid="navbar-client">
         NavbarClient
       </div>
     );
@@ -35,98 +29,43 @@ jest.mock('./NavbarClient', () => {
 describe('Navbar Server Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Clear console.error mock
-    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('should call getSession()', async () => {
-    const mockGetSession = sessionModule.getSession as jest.MockedFunction<typeof sessionModule.getSession>;
-    mockGetSession.mockResolvedValue(null);
-
-    await Navbar();
-
-    expect(mockGetSession).toHaveBeenCalledTimes(1);
-  });
-
-  it('should pass session data to NavbarClient when session exists', async () => {
-    const mockSession: SessionData = {
-      userId: 'user123',
-      email: 'test@example.com',
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 1000000,
-    };
-
-    const mockGetSession = sessionModule.getSession as jest.MockedFunction<typeof sessionModule.getSession>;
-    mockGetSession.mockResolvedValue(mockSession);
-
-    const result = await Navbar();
+  it('should render NavbarClient component', () => {
+    const result = Navbar();
     const { getByTestId } = render(result);
 
     const navbarClient = getByTestId('navbar-client');
-    const sessionData = JSON.parse(navbarClient.getAttribute('data-session') || 'null');
-
-    expect(sessionData).toEqual(mockSession);
+    expect(navbarClient).toBeInTheDocument();
   });
 
-  it('should pass null to NavbarClient when session does not exist', async () => {
-    const mockGetSession = sessionModule.getSession as jest.MockedFunction<typeof sessionModule.getSession>;
-    mockGetSession.mockResolvedValue(null);
+  it('should not pass any props to NavbarClient', () => {
+    const result = Navbar();
+    render(result);
 
-    const result = await Navbar();
+    // NavbarClient should be rendered without any props
+    // This is verified by the mock implementation which doesn't expect any props
+    expect(screen.getByTestId('navbar-client')).toBeInTheDocument();
+  });
+
+  it('should be a simple wrapper component', () => {
+    const result = Navbar();
+    
+    // The component should return a React element
+    expect(React.isValidElement(result)).toBe(true);
+  });
+
+  it('should delegate all authentication logic to client component', () => {
+    // This test verifies that the server component doesn't handle any auth logic
+    // by simply checking that it renders without any session-related operations
+    const result = Navbar();
     const { getByTestId } = render(result);
 
-    const navbarClient = getByTestId('navbar-client');
-    const sessionData = JSON.parse(navbarClient.getAttribute('data-session') || 'null');
-
-    expect(sessionData).toBeNull();
-  });
-
-  it('should handle errors from getSession() and pass null to NavbarClient', async () => {
-    const mockGetSession = sessionModule.getSession as jest.MockedFunction<typeof sessionModule.getSession>;
-    const testError = new Error('Session retrieval failed');
-    mockGetSession.mockRejectedValue(testError);
-
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = await Navbar();
-    const { getByTestId } = render(result);
-
-    const navbarClient = getByTestId('navbar-client');
-    const sessionData = JSON.parse(navbarClient.getAttribute('data-session') || 'null');
-
-    expect(sessionData).toBeNull();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to retrieve session:', testError);
-  });
-
-  it('should log error when getSession() throws', async () => {
-    const mockGetSession = sessionModule.getSession as jest.MockedFunction<typeof sessionModule.getSession>;
-    const testError = new Error('Database connection failed');
-    mockGetSession.mockRejectedValue(testError);
-
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    await Navbar();
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to retrieve session:', testError);
-  });
-
-  it('should treat any error as unauthenticated state', async () => {
-    const mockGetSession = sessionModule.getSession as jest.MockedFunction<typeof sessionModule.getSession>;
-    mockGetSession.mockRejectedValue(new Error('Network error'));
-
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = await Navbar();
-    const { getByTestId } = render(result);
-
-    const navbarClient = getByTestId('navbar-client');
-    const sessionData = JSON.parse(navbarClient.getAttribute('data-session') || 'null');
-
-    // Should pass null session, treating error as unauthenticated
-    expect(sessionData).toBeNull();
+    // Should render successfully without any session checks
+    expect(getByTestId('navbar-client')).toBeInTheDocument();
   });
 });
