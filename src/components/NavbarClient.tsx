@@ -83,6 +83,38 @@ export default function NavbarClient(): JSX.Element {
    */
   useEffect(() => {
     checkAuthState();
+    
+    // Listen for custom auth-token-changed events
+    // This event is dispatched by tokenManager when tokens are set or cleared
+    // Requirements: 5.2 - Update display immediately when authentication state changes
+    const handleAuthTokenChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('[NavbarClient] Auth token changed event received', {
+        action: customEvent.detail?.action,
+        traceId: customEvent.detail?.traceId,
+      });
+      checkAuthState();
+    };
+    
+    // Listen for storage events to sync auth state across tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      // Check if the jwt_token key changed (matches TOKEN_STORAGE_KEY in tokenManager)
+      if (e.key === 'jwt_token' || e.key === null) {
+        console.log('[NavbarClient] Storage event detected, re-checking auth state', {
+          key: e.key,
+          newValue: e.newValue ? 'present' : 'null',
+        });
+        checkAuthState();
+      }
+    };
+    
+    window.addEventListener('auth-token-changed', handleAuthTokenChange);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('auth-token-changed', handleAuthTokenChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Show minimal UI while loading to prevent flash of wrong content

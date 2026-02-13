@@ -239,6 +239,17 @@ export async function setToken(token: string, source?: string, traceId?: string)
         if (retrieved === token.trim()) {
           console.log('[TokenManager] Immediate verification passed', { traceId });
           logTokenOperation('set', true, undefined, source, traceId);
+          
+          // Dispatch custom event to notify components of token change
+          // This allows components like NavbarClient to update their auth state
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('auth-token-changed', {
+              detail: { action: 'set', traceId }
+            });
+            window.dispatchEvent(event);
+            console.log('[TokenManager] Dispatched auth-token-changed event', { traceId });
+          }
+          
           return true;
         } else {
           console.error('[TokenManager] Immediate verification failed', {
@@ -430,6 +441,15 @@ export function clearToken(reason?: string, source?: string, traceId?: string): 
           traceId,
         });
         logTokenOperation('clear', true, reason, source, traceId);
+        
+        // Dispatch custom event to notify components of token removal
+        if (typeof window !== 'undefined') {
+          const event = new CustomEvent('auth-token-changed', {
+            detail: { action: 'clear', reason, traceId }
+          });
+          window.dispatchEvent(event);
+          console.log('[TokenManager] Dispatched auth-token-changed event', { action: 'clear', traceId });
+        }
       } else {
         console.log('[TokenManager] No token to clear', {
           storageKey: TOKEN_STORAGE_KEY,

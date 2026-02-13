@@ -367,63 +367,70 @@ export default function DashboardPage() {
           traceId,
         });
         
-        if (isMountedRef.current) {
-          if (!authState.isAuthenticated) {
-            // Not authenticated - redirect to login with return URL
-            if (!redirectInitiatedRef.current) {
-              redirectInitiatedRef.current = true;
-              
-              // Build redirect URL with return URL parameter
-              // Preserve any existing query parameters from dashboard URL
-              let redirectUrl = '/login?returnUrl=/dashboard';
-              if (typeof window !== 'undefined') {
-                const currentParams = new URLSearchParams(window.location.search);
-                if (currentParams.toString()) {
-                  redirectUrl = `/login?returnUrl=${encodeURIComponent('/dashboard?' + currentParams.toString())}`;
-                }
-              }
-              
-              console.log('[Dashboard] Redirecting to login (not authenticated)', { 
-                traceId,
-                reason: authState.reason,
-                redirectUrl,
-              });
-              
-              try {
-                router.push(redirectUrl);
-                console.log('[Dashboard] Redirect initiated successfully', { traceId, redirectUrl });
-              } catch (navError) {
-                console.error('[Dashboard] router.push failed, using fallback', {
-                  error: navError instanceof Error ? navError.message : String(navError),
-                  timestamp: new Date().toISOString(),
-                  fallback: 'window.location.href',
-                  traceId,
-                  redirectUrl,
-                });
-                if (typeof window !== 'undefined') {
-                  window.location.href = redirectUrl;
-                  console.log('[Dashboard] Fallback redirect initiated successfully', { traceId, redirectUrl });
-                }
+        // DEBUG: Log the exact boolean value and type
+        console.log('[Dashboard] Checking authentication - isAuthenticated value:', {
+          value: authState.isAuthenticated,
+          type: typeof authState.isAuthenticated,
+          negated: !authState.isAuthenticated,
+          traceId,
+        });
+        
+        if (!authState.isAuthenticated) {
+          // Not authenticated - redirect to login with return URL
+          if (!redirectInitiatedRef.current) {
+            redirectInitiatedRef.current = true;
+            
+            // Build redirect URL with return URL parameter
+            // Preserve any existing query parameters from dashboard URL
+            let redirectUrl = '/login?returnUrl=/dashboard';
+            if (typeof window !== 'undefined') {
+              const currentParams = new URLSearchParams(window.location.search);
+              if (currentParams.toString()) {
+                redirectUrl = `/login?returnUrl=${encodeURIComponent('/dashboard?' + currentParams.toString())}`;
               }
             }
-          } else {
-            // Authenticated - show dashboard
-            console.log('[Dashboard] Authentication successful', { 
-              authMethod: authState.authMethod,
-              inFallbackMode: authState.inFallbackMode,
+            
+            console.log('[Dashboard] Redirecting to login (not authenticated)', { 
               traceId,
+              reason: authState.reason,
+              redirectUrl,
             });
             
             try {
-              setIsAuthenticated(true);
-            } catch (stateError) {
-              console.error('[Dashboard] Error setting authenticated state', {
-                error: stateError instanceof Error ? stateError.message : String(stateError),
+              router.push(redirectUrl);
+              console.log('[Dashboard] Redirect initiated successfully', { traceId, redirectUrl });
+            } catch (navError) {
+              console.error('[Dashboard] router.push failed, using fallback', {
+                error: navError instanceof Error ? navError.message : String(navError),
                 timestamp: new Date().toISOString(),
-                context: 'setIsAuthenticated state update',
+                fallback: 'window.location.href',
                 traceId,
+                redirectUrl,
               });
+              if (typeof window !== 'undefined') {
+                window.location.href = redirectUrl;
+                console.log('[Dashboard] Fallback redirect initiated successfully', { traceId, redirectUrl });
+              }
             }
+          }
+        } else {
+          // Authenticated - show dashboard
+          console.log('[Dashboard] Entering authenticated branch', { traceId });
+          console.log('[Dashboard] Authentication successful', { 
+            authMethod: authState.authMethod,
+            inFallbackMode: authState.inFallbackMode,
+            traceId,
+          });
+          
+          try {
+            setIsAuthenticated(true);
+          } catch (stateError) {
+            console.error('[Dashboard] Error setting authenticated state', {
+              error: stateError instanceof Error ? stateError.message : String(stateError),
+              timestamp: new Date().toISOString(),
+              context: 'setIsAuthenticated state update',
+              traceId,
+            });
           }
         }
         
@@ -511,6 +518,8 @@ export default function DashboardPage() {
     return () => {
       console.log('[Dashboard] Component unmounting', { traceId });
       isMountedRef.current = false;
+      // CRITICAL: Reset authCheckInProgressRef to allow re-mount to run auth check
+      // This is essential for React Strict Mode which unmounts and remounts components
       authCheckInProgressRef.current = false;
     };
   }, [router]);
