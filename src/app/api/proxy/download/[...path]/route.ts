@@ -42,24 +42,38 @@ export async function GET(
     // Get the jobId from the dynamic route (should be a single UUID)
     const jobId = params.path.join('/');
     
+    console.log('[Proxy] Download request received', {
+      jobId,
+      timestamp: new Date().toISOString(),
+      method: request.method
+    });
+    
     // Get the Authorization header from the request
     const authHeader = request.headers.get('authorization');
     
-    console.log('[Proxy] Request received for jobId:', jobId);
-    
     if (!authHeader) {
-      console.log('[Proxy] No authorization header, returning 401');
+      console.error('[Proxy] Missing authorization header');
       return NextResponse.json(
         { error: 'Missing authentication token' },
         { status: 401 }
       );
     }
+    
+    console.log('[Proxy] Authorization header present', {
+      hasBearer: authHeader.startsWith('Bearer '),
+      tokenLength: authHeader.replace('Bearer ', '').length
+    });
 
     // Build the backend URL using jobId
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
     const downloadUrl = `${backendUrl}/documents/download/${jobId}`;
     
-    console.log('[Proxy] Forwarding request to backend:', downloadUrl);
+    console.log('[Proxy] Forwarding to backend', {
+      backendUrl,
+      downloadUrl,
+      hasAuthHeader: !!authHeader,
+      timeout: '30s'
+    });
 
     // Make request to backend with JWT token and timeout
     const controller = new AbortController();
@@ -77,22 +91,31 @@ export async function GET(
       
       clearTimeout(timeoutId);
       
-      console.log('[Proxy] Backend response status:', response.status);
+      console.log('[Proxy] Backend response received', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('Content-Type'),
+        contentLength: response.headers.get('Content-Length'),
+        contentDisposition: response.headers.get('Content-Disposition')
+      });
 
       // Handle errors from backend
       if (!response.ok) {
         const errorText = await response.text();
-        console.log('[Proxy] Backend error response:', errorText);
+        console.error('[Proxy] Backend error', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        
         let errorMessage = 'Failed to download document';
         
         try {
           const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorMessage;
+          errorMessage = errorJson.message || errorJson.error || errorMessage;
         } catch {
           errorMessage = errorText || errorMessage;
         }
-        
-        console.log('[Proxy] Returning error to frontend:', errorMessage, 'Status:', response.status);
 
         return NextResponse.json(
           { error: errorMessage },
@@ -100,11 +123,34 @@ export async function GET(
         );
       }
       
-      console.log('[Proxy] Successfully received PDF from backend, streaming to frontend');
+      console.log('[Proxy] Converting backend response to arrayBuffer');
 
-      // Stream the PDF directly without converting to blob first
-      // This is more efficient for large files
-      const arrayBuffer = await response.arrayBuffer();
+      // Get the response as text first to check if it's base64 encoded
+      const responseText = await response.text();
+      
+      let arrayBuffer: ArrayBuffer;
+      
+      // Check if the response is base64 encoded (starts with JVBERi which is "%PDF" in base64)
+      if (responseText.startsWith('JVBERi')) {
+        console.log('[Proxy] Detected base64-encoded PDF, decoding...');
+        // Decode base64 to binary
+        const binaryString = atob(responseText);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        arrayBuffer = bytes.buffer;
+      } else {
+        console.log('[Proxy] Response is already binary');
+        // Convert text back to arrayBuffer (shouldn't happen, but handle it)
+        const encoder = new TextEncoder();
+        arrayBuffer = encoder.encode(responseText).buffer;
+      }
+      
+      console.log('[Proxy] PDF processed successfully', {
+        size: arrayBuffer.byteLength,
+        sizeKB: (arrayBuffer.byteLength / 1024).toFixed(2)
+      });
       
       // Return the PDF with proper headers
       return new NextResponse(arrayBuffer, {
@@ -120,18 +166,27 @@ export async function GET(
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        console.error('[Proxy] Request timeout');
+        console.error('[Proxy] Request timeout after 30 seconds');
         return NextResponse.json(
           { error: 'Request timeout. The backend took too long to respond.' },
           { status: 504 }
         );
       }
       
+      console.error('[Proxy] Fetch error', {
+        error: fetchError.message,
+        name: fetchError.name,
+        stack: fetchError.stack
+      });
+      
       throw fetchError;
     }
 
   } catch (error: any) {
-    console.error('[Proxy] Error downloading document:', error);
+    console.error('[Proxy] Error downloading document', {
+      error: error.message || error,
+      stack: error.stack
+    });
     
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

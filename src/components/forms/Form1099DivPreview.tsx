@@ -77,6 +77,12 @@ export function Form1099DivPreview({
     let currentBlobUrl: string | null = null;
 
     const fetchPdf = async () => {
+      console.log('[Form1099DivPreview] Fetching PDF', {
+        jobId: document.jobId,
+        outputKey: document.outputKey,
+        timestamp: new Date().toISOString()
+      });
+      
       setPdfLoading(true);
       setPdfError(null);
 
@@ -84,15 +90,46 @@ export function Form1099DivPreview({
         const blobUrl = await documentService.downloadDocument(document.jobId);
         
         if (isMounted) {
+          console.log('[Form1099DivPreview] PDF loaded successfully', {
+            blobUrl,
+            jobId: document.jobId
+          });
           currentBlobUrl = blobUrl;
           setPdfUrl(blobUrl);
           setPdfLoading(false);
+        } else {
+          console.log('[Form1099DivPreview] Component unmounted, discarding PDF');
         }
       } catch (error: any) {
-        console.error('[Form1099DivPreview] Error fetching PDF:', error);
+        console.error('[Form1099DivPreview] Error fetching PDF', {
+          error: error.message || error,
+          status: error.status,
+          jobId: document.jobId,
+          stack: error.stack
+        });
         
         if (isMounted) {
-          setPdfError(error.message || 'Failed to load PDF');
+          // Map error status to user-friendly message
+          let errorMessage = 'Failed to load PDF document';
+          
+          if (error.status === 404) {
+            errorMessage = 'Document not found or not ready yet. Please try again.';
+          } else if (error.status === 401) {
+            errorMessage = 'Authentication failed. Please log in again.';
+          } else if (error.status === 403) {
+            errorMessage = "You don't have permission to access this document.";
+          } else if (error.status === 500) {
+            errorMessage = 'Server error. Please try again later.';
+          } else if (error.status === 504) {
+            errorMessage = 'Request timeout. The PDF download took too long. Please try again.';
+          } else if (error.status === 0) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          
+          console.log('[Form1099DivPreview] Setting error message', { errorMessage });
+          setPdfError(errorMessage);
           setPdfLoading(false);
         }
       }
@@ -104,6 +141,7 @@ export function Form1099DivPreview({
     return () => {
       isMounted = false;
       if (currentBlobUrl) {
+        console.log('[Form1099DivPreview] Revoking blob URL', { blobUrl: currentBlobUrl });
         URL.revokeObjectURL(currentBlobUrl);
       }
     };

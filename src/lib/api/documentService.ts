@@ -292,6 +292,11 @@ export class DocumentService {
    * Requirements: 5.1, 5.2
    */
   async downloadDocument(jobId: string): Promise<string> {
+    console.log('[DocumentService] Starting PDF download', { 
+      jobId,
+      timestamp: new Date().toISOString()
+    });
+
     // Use Next.js API proxy route to bypass CORS issues
     // The proxy route forwards the request to the backend with authentication
     const downloadUrl = `/api/proxy/download/${jobId}`;
@@ -301,16 +306,25 @@ export class DocumentService {
 
     // Check if token exists
     if (!token) {
+      console.error('[DocumentService] No JWT token found in localStorage');
       throw {
         status: 401,
         message: 'Authentication required. Please log in again.'
       };
     }
+    
+    console.log('[DocumentService] JWT token found, length:', token.length);
 
     try {
       // Create abort controller for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 second timeout (slightly longer than proxy)
+
+      console.log('[DocumentService] Fetching from proxy', { 
+        downloadUrl,
+        hasAuthHeader: true,
+        timeout: '35s'
+      });
 
       try {
         // Fetch the PDF with authentication via proxy
@@ -325,9 +339,22 @@ export class DocumentService {
 
         clearTimeout(timeoutId);
 
+        console.log('[DocumentService] Proxy response received', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('Content-Type'),
+          contentLength: response.headers.get('Content-Length')
+        });
+
         // Handle errors
         if (!response.ok) {
           const errorText = await response.text();
+          console.error('[DocumentService] Error response from proxy', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          });
+          
           let errorMessage = 'Failed to download document';
           
           try {
@@ -345,32 +372,55 @@ export class DocumentService {
         }
 
         // Convert response to blob
+        console.log('[DocumentService] Converting response to blob');
         const blob = await response.blob();
+        console.log('[DocumentService] Blob created', {
+          size: blob.size,
+          type: blob.type
+        });
         
         // Create a blob URL
         const blobUrl = URL.createObjectURL(blob);
+        console.log('[DocumentService] Blob URL created', { 
+          blobUrl,
+          blobSize: blob.size
+        });
         
         return blobUrl;
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         
         if (fetchError.name === 'AbortError') {
+          console.error('[DocumentService] Request timeout after 35 seconds');
           throw {
             status: 504,
             message: 'Request timeout. The PDF download took too long. Please try again.'
           };
         }
         
+        console.error('[DocumentService] Fetch error', {
+          error: fetchError.message || fetchError,
+          name: fetchError.name,
+          stack: fetchError.stack
+        });
+        
         throw fetchError;
       }
     } catch (error: any) {
       // Handle network errors
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        console.error('[DocumentService] Network error - failed to fetch');
         throw {
           status: 0,
           message: 'Unable to download PDF. Please check your network connection and try again.'
         };
       }
+      
+      console.error('[DocumentService] Download failed', {
+        error: error.message || error,
+        status: error.status,
+        stack: error.stack
+      });
       
       // Re-throw other errors
       throw error;

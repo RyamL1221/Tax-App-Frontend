@@ -533,6 +533,15 @@ describe('DocumentService', () => {
       const mockBlob = new Blob(['PDF content'], { type: 'application/pdf' });
       const mockResponse = {
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: jest.fn((name: string) => {
+            if (name === 'Content-Type') return 'application/pdf';
+            if (name === 'Content-Length') return '1024';
+            return null;
+          })
+        },
         blob: jest.fn().mockResolvedValue(mockBlob)
       };
 
@@ -582,6 +591,13 @@ describe('DocumentService', () => {
       const mockResponse = {
         ok: false,
         status: 401,
+        statusText: 'Unauthorized',
+        headers: {
+          get: jest.fn((name: string) => {
+            if (name === 'Content-Type') return 'application/json';
+            return null;
+          })
+        },
         text: jest.fn().mockResolvedValue(JSON.stringify({ error: 'Unauthorized' }))
       };
 
