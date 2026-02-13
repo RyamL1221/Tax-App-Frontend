@@ -8,7 +8,9 @@
  * - In-page PDF preview with authenticated fetch
  * - Download button for generated PDF
  * - "Edit" button to return to form for modifications
- * - "Approve" button with success message and timeout
+ * - "Approve" button with automatic download, success message, and error handling
+ * - Comprehensive error handling for PDF loading and download failures
+ * - Loading states for async operations (PDF fetch, approve download)
  * - Full accessibility support (ARIA labels, keyboard navigation)
  * - Responsive design (mobile and desktop)
  * 
@@ -70,6 +72,8 @@ export function Form1099DivPreview({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   // Fetch PDF when component mounts or document changes
   useEffect(() => {
@@ -148,13 +152,90 @@ export function Form1099DivPreview({
   }, [document.outputKey]);
 
   // Handle approve button click
-  const handleApprove = () => {
-    setShowSuccess(true);
+  const handleApprove = async () => {
+    setIsApproving(true);
+    setApproveError(null);
     
-    // Show success message for 2 seconds, then call onApprove
-    setTimeout(() => {
-      onApprove();
-    }, 2000);
+    try {
+      console.log('[Form1099DivPreview] Starting approve with automatic download', {
+        jobId: document.jobId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Download PDF
+      const blobUrl = await documentService.downloadDocument(document.jobId);
+      
+      console.log('[Form1099DivPreview] Download successful, triggering browser download', {
+        blobUrl,
+        jobId: document.jobId
+      });
+      
+      // Trigger browser download
+      triggerDownload(blobUrl);
+      
+      // Clean up blob URL
+      URL.revokeObjectURL(blobUrl);
+      
+      console.log('[Form1099DivPreview] Download complete, showing success message');
+      
+      // Show success message
+      setShowSuccess(true);
+      
+      // Wait 2 seconds, then call onApprove
+      setTimeout(() => {
+        onApprove();
+      }, 2000);
+    } catch (error: any) {
+      console.error('[Form1099DivPreview] Error during approve download:', error);
+      
+      // Set user-friendly error message
+      let errorMessage = 'Failed to download PDF. Please use the download button to save your document.';
+      
+      if (error.status === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (error.status === 404) {
+        errorMessage = 'Document not found. Please try again.';
+      } else if (error.status === 403) {
+        errorMessage = "You don't have permission to access this document.";
+      } else if (error.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.status === 504) {
+        errorMessage = 'Request timeout. The PDF download took too long. Please try again.';
+      } else if (error.status === 0) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setApproveError(errorMessage);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  // Helper function to trigger browser download
+  const triggerDownload = (blobUrl: string) => {
+    console.log('[Form1099DivPreview] Creating download link', {
+      blobUrl,
+      filename: `1099-DIV-${document.jobId}.pdf`
+    });
+    
+    // Create temporary download link
+    // Note: Using window.document to avoid collision with the 'document' prop
+    const link = window.document.createElement('a');
+    link.href = blobUrl;
+    link.download = `1099-DIV-${document.jobId}.pdf`;
+    
+    // Append to body (required for Firefox)
+    window.document.body.appendChild(link);
+    
+    // Trigger download
+    link.click();
+    
+    // Clean up
+    window.document.body.removeChild(link);
+    
+    console.log('[Form1099DivPreview] Download link clicked and cleaned up');
   };
 
   // Reset success state if document changes
@@ -394,25 +475,60 @@ export function Form1099DivPreview({
           variant="primary"
           size="lg"
           className="w-full sm:w-auto sm:flex-1"
+          disabled={isApproving}
           aria-label="Approve and finalize form"
         >
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          Approve
+          {isApproving ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Downloading...
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Approve
+            </>
+          )}
         </Button>
       </div>
+
+      {/* Approve Error Message */}
+      {approveError && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4" role="alert">
+          <div className="flex items-start">
+            <svg
+              className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div className="text-sm text-red-800">
+              <p className="font-medium mb-1">Download Failed</p>
+              <p className="text-red-700">{approveError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Help Text */}
       <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
