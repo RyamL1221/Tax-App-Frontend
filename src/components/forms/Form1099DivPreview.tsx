@@ -20,6 +20,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { documentService } from '@/lib/api';
@@ -68,7 +69,9 @@ export function Form1099DivPreview({
   onApprove,
   className 
 }: Form1099DivPreviewProps) {
+  const router = useRouter();
   const [showSuccess, setShowSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(5);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -178,13 +181,9 @@ export function Form1099DivPreview({
       
       console.log('[Form1099DivPreview] Download complete, showing success message');
       
-      // Show success message
+      // Show success message with countdown
       setShowSuccess(true);
-      
-      // Wait 2 seconds, then call onApprove
-      setTimeout(() => {
-        onApprove();
-      }, 2000);
+      setCountdown(5);
     } catch (error: any) {
       console.error('[Form1099DivPreview] Error during approve download:', error);
       
@@ -241,7 +240,28 @@ export function Form1099DivPreview({
   // Reset success state if document changes
   useEffect(() => {
     setShowSuccess(false);
+    setCountdown(5);
   }, [document.jobId]);
+
+  // Countdown timer for redirect after approval
+  useEffect(() => {
+    if (!showSuccess) return;
+    
+    // If countdown reaches 0, navigate to dashboard
+    if (countdown === 0) {
+      console.log('[Form1099DivPreview] Countdown complete, navigating to dashboard');
+      onApprove();
+      router.push('/dashboard');
+      return;
+    }
+    
+    // Decrement countdown every second
+    const timer = setTimeout(() => {
+      setCountdown(prev => prev - 1);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [showSuccess, countdown, onApprove, router]);
 
   // If showing success message, display it
   if (showSuccess) {
@@ -254,11 +274,11 @@ export function Form1099DivPreview({
           className
         )}
       >
-        <div className="flex flex-col items-center space-y-4 max-w-md text-center">
+        <div className="flex flex-col items-center space-y-6 max-w-md text-center">
           {/* Success Icon */}
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
             <svg
-              className="w-10 h-10 text-green-600"
+              className="w-12 h-12 text-green-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -274,14 +294,69 @@ export function Form1099DivPreview({
           </div>
           
           {/* Success Message */}
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-gray-900">
               Form Approved Successfully!
             </h2>
             <p className="text-gray-600">
               Your 1099-DIV form has been finalized.
             </p>
           </div>
+          
+          {/* Download Notification */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 w-full">
+            <div className="flex items-center justify-center space-x-2">
+              <svg
+                className="w-5 h-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              <p className="text-sm font-medium text-blue-800">
+                Your PDF is downloading automatically
+              </p>
+            </div>
+          </div>
+          
+          {/* Countdown and Redirect Info */}
+          <div className="space-y-3">
+            <p className="text-gray-500 text-sm">
+              Redirecting to dashboard in...
+            </p>
+            <div className="flex items-center justify-center">
+              <span 
+                className="text-4xl font-bold text-blue-600"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {countdown}
+              </span>
+            </div>
+            <p className="text-gray-400 text-xs">
+              seconds
+            </p>
+          </div>
+          
+          {/* Manual Navigation Button */}
+          <Button
+            onClick={() => {
+              onApprove();
+              router.push('/dashboard');
+            }}
+            variant="secondary"
+            size="lg"
+            className="mt-2"
+          >
+            Go to Dashboard Now
+          </Button>
         </div>
       </div>
     );
