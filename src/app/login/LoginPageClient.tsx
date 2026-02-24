@@ -121,11 +121,11 @@ export interface LoginPageClientProps {
 export default function LoginPageClient({ callbackUrl, expired }: LoginPageClientProps) {
   const router = useRouter();
   const [showExpiredMessage, setShowExpiredMessage] = React.useState(expired || false);
-  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
   const [savedFormInfo, setSavedFormInfo] = React.useState<{
     formType: string;
     returnUrl: string;
   } | null>(null);
+  const mountedRef = React.useRef(true);
 
   /**
    * Check if user is already authenticated
@@ -135,9 +135,14 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
    * Requirements: 7.5 (jwt-only-authentication)
    */
   React.useEffect(() => {
+    mountedRef.current = true;
+    
     const checkAuth = async () => {
       try {
         const authState = await getAuthState();
+        
+        if (!mountedRef.current) return;
+        
         console.log('[LoginPageClient] Auth state:', authState);
         
         // Check for saved form data first
@@ -171,7 +176,6 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
           // Check for redirect loop before auto-redirecting
           if (detectRedirectLoop()) {
             console.warn('[LoginPageClient] Redirect loop detected, stopping auto-redirect and showing login form');
-            setIsCheckingAuth(false);
             return;
           }
           
@@ -184,13 +188,9 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
         if (authState.isAuthenticated && arrivedViaRedirect) {
           console.log('[LoginPageClient] User authenticated but arrived via redirect (callbackUrl=%s, expired=%s) — showing login form to prevent redirect loop', callbackUrl, expired);
         }
-        
-        // User not authenticated, has saved form data, or arrived via redirect — show login form
-        setIsCheckingAuth(false);
       } catch (error) {
         console.error('[LoginPageClient] Error checking auth state:', error);
-        // On error, assume not authenticated and show login form
-        setIsCheckingAuth(false);
+        // On error, just show the login form (already visible)
       }
     };
 
@@ -206,7 +206,10 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
     };
     
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [router, callbackUrl, expired]);
 
   /**
@@ -280,15 +283,6 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
     // This callback is provided for potential future logging or analytics
     console.error('Login error:', error);
   };
-
-  // Show loading state while checking authentication
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <ErrorBoundary>

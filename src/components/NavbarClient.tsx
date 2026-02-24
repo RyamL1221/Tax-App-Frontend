@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { getAuthState } from '@/lib/auth/AuthCoordinator';
 import { LogoutButton } from '@/components/LogoutButton';
+import { hasToken } from '@/lib/api/tokenManager';
 
 /**
  * NavbarClient component that renders navigation links based on JWT authentication state
@@ -17,7 +18,8 @@ import { LogoutButton } from '@/components/LogoutButton';
  * - Shows Login and Register links for unauthenticated users (no JWT token)
  * - Shows Dashboard link and LogoutButton for authenticated users (JWT token present)
  * - Uses AuthCoordinator for unified authentication state management
- * - Handles loading state to prevent flash of wrong content
+ * - Shows Login/Register by default during loading for better UX
+ * - Timeout protection to prevent infinite loading states
  * - Uses Next.js Link component for client-side navigation
  * - Keyboard accessible navigation
  * 
@@ -49,8 +51,20 @@ import { LogoutButton } from '@/components/LogoutButton';
  * ```
  */
 export default function NavbarClient(): JSX.Element {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Initialize auth state synchronously from localStorage for immediate render
+  // This prevents the "flash of wrong content" issue
+  const getInitialAuthState = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return hasToken('NavbarClient-init');
+    } catch {
+      return false;
+    }
+  };
+
+  const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthState);
   const [isLoading, setIsLoading] = useState(true);
+  const mountedRef = useRef(true);
 
   /**
    * Check authentication state using AuthCoordinator
@@ -60,21 +74,25 @@ export default function NavbarClient(): JSX.Element {
    * 
    * Requirements: 1.1, 1.2, 1.3, 5.3
    */
-  const checkAuthState = async () => {
+  const checkAuthState = useCallback(async () => {
     try {
       const authState = await getAuthState();
-      console.log('[NavbarClient] Auth state received:', authState);
       
-      // Use isAuthenticated to determine authentication status
-      setIsAuthenticated(authState.isAuthenticated);
-      setIsLoading(false);
+      // Only update state if component is still mounted
+      if (mountedRef.current) {
+        console.log('[NavbarClient] Auth state received:', authState);
+        setIsAuthenticated(authState.isAuthenticated);
+        setIsLoading(false);
+      }
     } catch (error) {
       // On error, default to unauthenticated state
-      console.error('[NavbarClient] Error checking auth state:', error);
-      setIsAuthenticated(false);
-      setIsLoading(false);
+      if (mountedRef.current) {
+        console.error('[NavbarClient] Error checking auth state:', error);
+        setIsAuthenticated(false);
+        setIsLoading(false);
+      }
     }
-  };
+  }, []);
 
   /**
    * Check authentication state on component mount
@@ -82,6 +100,17 @@ export default function NavbarClient(): JSX.Element {
    * Requirements: 5.4
    */
   useEffect(() => {
+    mountedRef.current = true;
+    
+    // Set a timeout to ensure loading state doesn't persist forever
+    // If auth check takes longer than 2 seconds, show unauthenticated state
+    const timeoutId = setTimeout(() => {
+      if (mountedRef.current && isLoading) {
+        console.warn('[NavbarClient] Auth check timeout - defaulting to unauthenticated');
+        setIsLoading(false);
+      }
+    }, 2000);
+    
     checkAuthState();
     
     // Listen for custom auth-token-changed events
@@ -112,34 +141,12 @@ export default function NavbarClient(): JSX.Element {
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
+      mountedRef.current = false;
+      clearTimeout(timeoutId);
       window.removeEventListener('auth-token-changed', handleAuthTokenChange);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
-
-  // Show minimal UI while loading to prevent flash of wrong content
-  // Requirements: 1.4
-  if (isLoading) {
-    return (
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center flex-shrink-0">
-              <Link 
-                href="/" 
-                className="text-lg sm:text-xl font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200"
-              >
-                Home
-              </Link>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* Loading state - show minimal UI */}
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
-  }
+  }, [checkAuthState, isLoading]);
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
