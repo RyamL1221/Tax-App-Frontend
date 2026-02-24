@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { RegistrationForm } from '@/components/RegistrationForm';
 import { Card, CardHeader, CardContent } from '@/components/ui/Card';
@@ -35,7 +35,7 @@ export interface RegisterPageClientProps {
  */
 export default function RegisterPageClient({ callbackUrl }: RegisterPageClientProps) {
   const router = useRouter();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const mountedRef = useRef(true);
 
   /**
    * Check if user is already authenticated
@@ -45,9 +45,14 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
    * Requirements: 10.4, 7.5 (jwt-only-authentication)
    */
   useEffect(() => {
+    mountedRef.current = true;
+    
     const checkAuth = async () => {
       try {
         const authState = await getAuthState();
+        
+        if (!mountedRef.current) return;
+        
         console.log('[RegisterPageClient] Auth state:', authState);
         
         // If user is authenticated, redirect to dashboard
@@ -57,13 +62,9 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
           router.push(targetUrl);
           return;
         }
-        
-        // User not authenticated, show register form
-        setIsCheckingAuth(false);
       } catch (error) {
         console.error('[RegisterPageClient] Error checking auth state:', error);
-        // On error, assume not authenticated and show register form
-        setIsCheckingAuth(false);
+        // On error, just show the register form (already visible)
       }
     };
 
@@ -72,14 +73,17 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
     // Listen for storage events to sync across tabs
     // Requirements: 7.5 (jwt-only-authentication)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'token') {
+      if (e.key === 'jwt_token') {
         console.log('[RegisterPageClient] Token changed in another tab, re-checking auth');
         checkAuth();
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [router, callbackUrl]);
 
   /**
@@ -90,15 +94,6 @@ export default function RegisterPageClient({ callbackUrl }: RegisterPageClientPr
     const targetUrl = callbackUrl || '/dashboard';
     router.push(targetUrl);
   };
-
-  // Show loading state while checking authentication
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <ErrorBoundary>

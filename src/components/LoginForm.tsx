@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useLoginForm, UseLoginFormOptions } from '@/hooks/useLoginForm';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -20,10 +21,12 @@ export interface LoginFormProps extends UseLoginFormOptions {
  * 
  * Features:
  * - Email and password input fields with validation
+ * - Password visibility toggle
  * - Submit button with loading state
  * - General error message display
  * - Error clearing on field input
  * - Rate limiting support
+ * - Forgot password link (navigates to /forgot-password)
  * - Accessibility features (ARIA labels, keyboard navigation)
  * 
  * Requirements:
@@ -33,6 +36,8 @@ export interface LoginFormProps extends UseLoginFormOptions {
  * - 3.2: Prevent additional submissions while processing
  * - 3.3: Re-enable submit button after completion
  * - 3.4: Clear field errors when user types
+ * - 4.1-4.4: Password visibility toggle
+ * - password-recovery/10.5: Link to forgot password page
  * 
  * @example
  * ```tsx
@@ -322,6 +327,16 @@ export function LoginForm({ className, onSuccess, onError }: LoginFormProps) {
             <span>{errors.password.message}</span>
           </div>
         )}
+        
+        {/* Forgot Password Link */}
+        <div className="mt-2 text-right">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
+          >
+            Forgot password?
+          </Link>
+        </div>
       </div>
 
       {/* Submit Button */}

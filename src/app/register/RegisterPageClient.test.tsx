@@ -202,14 +202,12 @@ describe('RegisterPageClient', () => {
               <RegisterPageClient callbackUrl={callbackUrl} />
             );
 
-            // Property: Authenticated users should be redirected immediately
+            // Property: Authenticated users should be redirected
+            // Form is rendered immediately (no loading state), redirect happens after auth check
             await waitFor(() => {
               const expectedUrl = callbackUrl || '/dashboard';
               expect(mockPush).toHaveBeenCalledWith(expectedUrl);
             });
-
-            // Property: Registration form should NOT be rendered for authenticated users
-            expect(screen.queryByTestId('registration-form')).not.toBeInTheDocument();
 
             unmount();
           }
@@ -268,12 +266,10 @@ describe('RegisterPageClient', () => {
 
       render(<RegisterPageClient />);
 
+      // Form is rendered immediately (no loading state), redirect happens after auth check
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith('/dashboard');
       });
-
-      // Form should not be rendered
-      expect(screen.queryByTestId('registration-form')).not.toBeInTheDocument();
     });
 
     it('should redirect authenticated users to custom callback URL', async () => {
@@ -371,7 +367,7 @@ describe('RegisterPageClient', () => {
       });
     });
 
-    it('should show loading state while checking authentication', () => {
+    it('should render form immediately without loading state', () => {
       // Mock pending auth check (never resolves)
       mockGetAuthState.mockImplementationOnce(
         () => new Promise(() => {})
@@ -379,8 +375,9 @@ describe('RegisterPageClient', () => {
 
       render(<RegisterPageClient />);
 
-      // Should show loading state while checking auth
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      // Form should be rendered immediately (no loading state)
+      // Auth check runs in background and redirects if needed
+      expect(screen.getByTestId('registration-form')).toBeInTheDocument();
     });
 
     it('should handle auth check errors gracefully', async () => {
