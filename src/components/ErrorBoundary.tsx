@@ -13,16 +13,26 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+  isLogoutActive: boolean;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
+  private handleLogoutStateChange?: (event: Event) => void;
+
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    // Initialize with current logout state, but check if it's stale
+    // This prevents showing logout UI on page load if state is old
+    const isCurrentlyLoggingOut = logoutStateManager.isLogoutInProgress();
+    this.state = { 
+      hasError: false,
+      isLogoutActive: isCurrentlyLoggingOut
+    };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     // Update state so the next render will show the fallback UI
+    // Only update hasError and error, preserve isLogoutActive
     return { hasError: true, error };
   }
 
@@ -46,22 +56,54 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   }
 
+  componentDidMount() {
+    // Check if logout state is stale on mount and clear it
+    // This handles cases where the page is refreshed with old logout state
+    const isActive = logoutStateManager.isLogoutInProgress();
+    if (this.state.isLogoutActive !== isActive) {
+      this.setState({ isLogoutActive: isActive });
+    }
+    
+    // Listen for logout state changes
+    this.handleLogoutStateChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ state: string }>;
+      const isActive = customEvent.detail.state === 'in-progress';
+      this.setState({ isLogoutActive: isActive });
+    };
+    
+    window.addEventListener('logoutStateChange', this.handleLogoutStateChange);
+  }
+
+  componentWillUnmount() {
+    // Clean up event listener
+    if (this.handleLogoutStateChange) {
+      window.removeEventListener('logoutStateChange', this.handleLogoutStateChange);
+    }
+  }
+
   handleRetry = () => {
     this.setState({ hasError: false, error: undefined });
   };
 
   render() {
-    // Check if logout is in progress FIRST (Task 9.3)
-    // Requirements: 3.5, 8.1, 8.2, 8.3
-    if (logoutStateManager.isLogoutInProgress()) {
-      // Show logout transition instead of error UI
+    // Check React state instead of sessionStorage directly
+    // This ensures the component re-renders when logout state changes
+    if (this.state.isLogoutActive) {
+      // Show logout transition as an overlay, but still render children
+      // This allows the navbar and page structure to remain visible
       return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <div className="text-gray-600">Logging out...</div>
+        <>
+          {this.props.children}
+          <div 
+            className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50"
+            style={{ backdropFilter: 'blur(4px)' }}
+          >
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="text-gray-600">Logging out...</div>
+            </div>
           </div>
-        </div>
+        </>
       );
     }
     
