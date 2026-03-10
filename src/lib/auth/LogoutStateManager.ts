@@ -140,57 +140,109 @@ class LogoutStateManagerImpl implements ILogoutStateManager {
   private readonly STORAGE_KEY = 'logout_state';
 
   /**
+   * Timeout duration in milliseconds for automatic state clearing
+   * After this duration, logout state is considered stale and will be automatically cleared
+   * @private
+   */
+  private readonly LOGOUT_TIMEOUT_MS = 5000;
+
+  /**
    * Set logout state to in-progress
-   * 
-   * Stores 'in-progress' in sessionStorage. Safe to call on server
-   * (no-op when window is undefined).
+   *
+   * Stores 'in-progress' with timestamp in sessionStorage as JSON object.
+   * Dispatches a custom event to notify listeners of the state change.
+   * Safe to call on server (no-op when window is undefined).
    */
   setLogoutInProgress(): void {
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem(this.STORAGE_KEY, 'in-progress');
+      const stateData = {
+        state: 'in-progress',
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(stateData));
+      
+      // Dispatch custom event to notify listeners (e.g., ErrorBoundary)
+      window.dispatchEvent(new CustomEvent('logoutStateChange', { 
+        detail: { state: 'in-progress' } 
+      }));
     }
   }
 
   /**
    * Check if logout is currently in progress
-   * 
-   * Returns true if sessionStorage contains 'in-progress', false otherwise.
+   *
+   * Returns true if sessionStorage contains 'in-progress' and the elapsed time
+   * is less than LOGOUT_TIMEOUT_MS. If the elapsed time exceeds the timeout,
+   * automatically clears the stale state and returns false.
    * Always returns false on server (when window is undefined).
-   * 
+   *
    * @returns true if logout is in progress, false otherwise
    */
   isLogoutInProgress(): boolean {
     if (typeof window !== 'undefined') {
-      return sessionStorage.getItem(this.STORAGE_KEY) === 'in-progress';
+      const stored = sessionStorage.getItem(this.STORAGE_KEY);
+      if (!stored) return false;
+
+      try {
+        const stateData = JSON.parse(stored);
+        const elapsedTime = Date.now() - stateData.timestamp;
+
+        // If elapsed time exceeds timeout, clear stale state and return false
+        if (elapsedTime > this.LOGOUT_TIMEOUT_MS) {
+          this.clearLogoutState();
+          return false;
+        }
+
+        // Otherwise, return true if state is 'in-progress'
+        return stateData.state === 'in-progress';
+      } catch (error) {
+        // If JSON parsing fails, clear invalid state
+        this.clearLogoutState();
+        return false;
+      }
     }
     return false;
   }
 
   /**
    * Clear logout state back to idle
-   * 
-   * Removes the logout state from sessionStorage. Safe to call on server
-   * (no-op when window is undefined).
+   *
+   * Removes the entire JSON object from sessionStorage.
+   * Dispatches a custom event to notify listeners of the state change.
+   * Safe to call on server (no-op when window is undefined).
    */
   clearLogoutState(): void {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem(this.STORAGE_KEY);
+      
+      // Dispatch custom event to notify listeners (e.g., ErrorBoundary)
+      window.dispatchEvent(new CustomEvent('logoutStateChange', { 
+        detail: { state: 'idle' } 
+      }));
     }
   }
 
   /**
    * Get current logout state
-   * 
-   * Returns the current state from sessionStorage, or 'idle' if not set
-   * or if running on server.
-   * 
+   *
+   * Returns the current state from sessionStorage by parsing the JSON object,
+   * or 'idle' if not set or if running on server.
+   *
    * @returns Current logout state
    */
   getLogoutState(): LogoutState {
     if (typeof window !== 'undefined') {
-      const state = sessionStorage.getItem(this.STORAGE_KEY);
-      if (state === 'in-progress') return 'in-progress';
-      if (state === 'complete') return 'complete';
+      const stored = sessionStorage.getItem(this.STORAGE_KEY);
+      if (!stored) return 'idle';
+
+      try {
+        const stateData = JSON.parse(stored);
+        if (stateData.state === 'in-progress') return 'in-progress';
+        if (stateData.state === 'complete') return 'complete';
+      } catch (error) {
+        // If JSON parsing fails, return idle
+        return 'idle';
+      }
     }
     return 'idle';
   }

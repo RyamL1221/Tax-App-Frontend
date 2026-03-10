@@ -32,18 +32,26 @@ describe('LogoutStateManager', () => {
       logoutStateManager.setLogoutInProgress();
 
       // Assert
-      expect(sessionStorage.getItem('logout_state')).toBe('in-progress');
+      const stored = sessionStorage.getItem('logout_state');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.state).toBe('in-progress');
+      expect(parsed.timestamp).toBeDefined();
+      expect(typeof parsed.timestamp).toBe('number');
     });
 
     it('should overwrite existing state', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'idle');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'idle', timestamp: Date.now() }));
 
       // Act
       logoutStateManager.setLogoutInProgress();
 
       // Assert
-      expect(sessionStorage.getItem('logout_state')).toBe('in-progress');
+      const stored = sessionStorage.getItem('logout_state');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.state).toBe('in-progress');
     });
 
     it('should be callable multiple times', () => {
@@ -53,7 +61,10 @@ describe('LogoutStateManager', () => {
       logoutStateManager.setLogoutInProgress();
 
       // Assert
-      expect(sessionStorage.getItem('logout_state')).toBe('in-progress');
+      const stored = sessionStorage.getItem('logout_state');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.state).toBe('in-progress');
     });
   });
 
@@ -68,7 +79,7 @@ describe('LogoutStateManager', () => {
 
     it('should return true when state is in-progress', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'in-progress');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: Date.now() }));
 
       // Act
       const result = logoutStateManager.isLogoutInProgress();
@@ -79,7 +90,7 @@ describe('LogoutStateManager', () => {
 
     it('should return false when state is idle', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'idle');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'idle', timestamp: Date.now() }));
 
       // Act
       const result = logoutStateManager.isLogoutInProgress();
@@ -90,7 +101,7 @@ describe('LogoutStateManager', () => {
 
     it('should return false when state is complete', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'complete');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'complete', timestamp: Date.now() }));
 
       // Act
       const result = logoutStateManager.isLogoutInProgress();
@@ -125,7 +136,7 @@ describe('LogoutStateManager', () => {
   describe('clearLogoutState', () => {
     it('should remove logout state from sessionStorage', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'in-progress');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: Date.now() }));
 
       // Act
       logoutStateManager.clearLogoutState();
@@ -177,7 +188,7 @@ describe('LogoutStateManager', () => {
 
     it('should return in-progress when state is in-progress', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'in-progress');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: Date.now() }));
 
       // Act
       const state = logoutStateManager.getLogoutState();
@@ -188,7 +199,7 @@ describe('LogoutStateManager', () => {
 
     it('should return complete when state is complete', () => {
       // Arrange
-      sessionStorage.setItem('logout_state', 'complete');
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'complete', timestamp: Date.now() }));
 
       // Act
       const state = logoutStateManager.getLogoutState();
@@ -359,7 +370,10 @@ describe('LogoutStateManager', () => {
       logoutStateManager.setLogoutInProgress();
 
       // Assert
-      expect(sessionStorage.getItem('logout_state')).toBe('in-progress');
+      const stored = sessionStorage.getItem('logout_state');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.state).toBe('in-progress');
     });
 
     it('should satisfy requirement 2.2: detect logout-in-progress flag', () => {
@@ -416,3 +430,126 @@ describe('LogoutStateManager', () => {
     });
   });
 });
+
+  describe('timeout-based state clearing', () => {
+    it('should automatically clear state after timeout', () => {
+      // Arrange - set state with old timestamp (6 seconds ago)
+      const oldTimestamp = Date.now() - 6000;
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: oldTimestamp }));
+
+      // Act
+      const result = logoutStateManager.isLogoutInProgress();
+
+      // Assert - should return false and clear state
+      expect(result).toBe(false);
+      expect(sessionStorage.getItem('logout_state')).toBeNull();
+    });
+
+    it('should not clear state before timeout', () => {
+      // Arrange - set state with recent timestamp (2 seconds ago)
+      const recentTimestamp = Date.now() - 2000;
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: recentTimestamp }));
+
+      // Act
+      const result = logoutStateManager.isLogoutInProgress();
+
+      // Assert - should return true and keep state
+      expect(result).toBe(true);
+      expect(sessionStorage.getItem('logout_state')).toBeTruthy();
+    });
+
+    it('should clear state at exactly timeout boundary', () => {
+      // Arrange - set state with timestamp exactly 5001ms ago
+      const boundaryTimestamp = Date.now() - 5001;
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: boundaryTimestamp }));
+
+      // Act
+      const result = logoutStateManager.isLogoutInProgress();
+
+      // Assert - should return false and clear state
+      expect(result).toBe(false);
+      expect(sessionStorage.getItem('logout_state')).toBeNull();
+    });
+
+    it('should not clear state just before timeout boundary', () => {
+      // Arrange - set state with timestamp 4999ms ago
+      const justBeforeTimeout = Date.now() - 4999;
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: justBeforeTimeout }));
+
+      // Act
+      const result = logoutStateManager.isLogoutInProgress();
+
+      // Assert - should return true and keep state
+      expect(result).toBe(true);
+      expect(sessionStorage.getItem('logout_state')).toBeTruthy();
+    });
+
+    it('should handle multiple checks of stale state consistently', () => {
+      // Arrange - set stale state (10 seconds ago)
+      const staleTimestamp = Date.now() - 10000;
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: staleTimestamp }));
+
+      // Act - check multiple times
+      const check1 = logoutStateManager.isLogoutInProgress();
+      const check2 = logoutStateManager.isLogoutInProgress();
+      const check3 = logoutStateManager.isLogoutInProgress();
+
+      // Assert - all checks should return false
+      expect(check1).toBe(false);
+      expect(check2).toBe(false);
+      expect(check3).toBe(false);
+      expect(sessionStorage.getItem('logout_state')).toBeNull();
+    });
+
+    it('should handle getLogoutState with stale timestamp', () => {
+      // Arrange - set stale state (10 seconds ago)
+      const staleTimestamp = Date.now() - 10000;
+      sessionStorage.setItem('logout_state', JSON.stringify({ state: 'in-progress', timestamp: staleTimestamp }));
+
+      // Act - getLogoutState doesn't check timeout, only isLogoutInProgress does
+      const state = logoutStateManager.getLogoutState();
+
+      // Assert - getLogoutState returns the stored state without timeout check
+      expect(state).toBe('in-progress');
+    });
+
+    it('should store timestamp when setting logout in progress', () => {
+      // Arrange
+      const beforeTimestamp = Date.now();
+
+      // Act
+      logoutStateManager.setLogoutInProgress();
+
+      // Assert
+      const stored = sessionStorage.getItem('logout_state');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.timestamp).toBeDefined();
+      expect(parsed.timestamp).toBeGreaterThanOrEqual(beforeTimestamp);
+      expect(parsed.timestamp).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('should update timestamp on subsequent setLogoutInProgress calls', () => {
+      // Arrange
+      logoutStateManager.setLogoutInProgress();
+      const firstStored = sessionStorage.getItem('logout_state');
+      const firstParsed = JSON.parse(firstStored!);
+      const firstTimestamp = firstParsed.timestamp;
+
+      // Wait a bit
+      const waitTime = 100;
+      const start = Date.now();
+      while (Date.now() - start < waitTime) {
+        // busy wait
+      }
+
+      // Act
+      logoutStateManager.setLogoutInProgress();
+
+      // Assert
+      const secondStored = sessionStorage.getItem('logout_state');
+      const secondParsed = JSON.parse(secondStored!);
+      const secondTimestamp = secondParsed.timestamp;
+      expect(secondTimestamp).toBeGreaterThan(firstTimestamp);
+    });
+  });
