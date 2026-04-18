@@ -229,7 +229,7 @@ export function parseCsvUploadResponse(json: unknown): CsvUploadResult {
  * CsvUploadService handles uploading CSV files for bulk 1099-DIV generation.
  *
  * - Builds FormData with the file attached
- * - Sends POST to /api/proxy/csv-upload with JWT Authorization header
+ * - Sends POST to ${NEXT_PUBLIC_API_URL}/documents/import/1099-div with JWT Authorization header
  * - Uses AbortController with a 60-second timeout
  * - Parses and validates the response via parseCsvUploadResponse
  * - Throws { status, message } for non-OK responses
@@ -254,7 +254,7 @@ export class CsvUploadService {
     const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
     try {
-      const response = await fetch('/api/proxy/csv-upload', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/documents/import/1099-div`, {
         method: 'POST',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

@@ -45,11 +45,11 @@ export default function CsvUploadClient({ className }: CsvUploadClientProps) {
   );
 
   /**
-   * Download a generated PDF via the existing download proxy.
-   * Requirement 7.4: use existing document download proxy.
+   * Download a generated PDF directly from the backend API.
+   * Requirement 7.4: use direct backend document download.
    */
   const handleDownload = useCallback(async (jobId: string) => {
-    const downloadUrl = `/api/proxy/download/${jobId}`;
+    const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL}/documents/download/${jobId}`;
     const token =
       typeof window !== 'undefined'
         ? localStorage.getItem('jwt_token')
