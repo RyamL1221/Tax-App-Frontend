@@ -4,6 +4,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { FORM_1099_DIV_URLS } from '@/lib/config/cloudFrontAssets';
 import { TemplateLinkPanel, AssetLink } from './TemplateLinkPanel';
+import CsvUploadClient from '@/app/forms/1099-div/csv-upload/CsvUploadClient';
 
 export interface CsvUploadSectionProps {
   className?: string;
@@ -78,6 +79,11 @@ export function CsvUploadSection({ className }: CsvUploadSectionProps) {
       </div>
 
       <TemplateLinkPanel links={csvUploadLinks} />
+
+      {/* CSV Upload Interface */}
+      <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+        <CsvUploadClient />
+      </div>
 
       <p className="text-xs text-gray-500 italic">
         Note: The blank 1099-DIV form is provided for reference purposes only.
