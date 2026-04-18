@@ -1,5 +1,6 @@
 import Form1099DivClient from './Form1099DivClient';
 import { FormAuthGuard } from '@/components/auth/FormAuthGuard';
+import { CsvUploadSection } from '@/components/forms/CsvUploadSection';
 
 /**
  * 1099-DIV Form Page
@@ -39,6 +40,9 @@ export default function Form1099DivPage() {
               Complete your Form 1099-DIV for dividends and distributions
             </p>
           </div>
+
+          {/* CSV Bulk Upload Section - no auth required (static links) */}
+          <CsvUploadSection className="mb-8" />
 
           {/* Form Client Component wrapped in FormAuthGuard */}
           <FormAuthGuard>

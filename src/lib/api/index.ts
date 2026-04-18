@@ -92,6 +92,15 @@ export const authService = new AuthService(apiClient, tokenManager);
  */
 export const documentService = new DocumentService(apiClient);
 
+/**
+ * Singleton CsvUploadService instance for bulk CSV upload
+ *
+ * Provides methods for:
+ * - Uploading CSV files for bulk 1099-DIV generation
+ * - Parsing and validating structured upload results
+ */
+export { csvUploadService } from './csvUploadService';
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -136,6 +145,13 @@ export type { ValidationResult } from './validators';
 // ============================================================================
 
 export { ErrorHandler } from './errorHandler';
+
+// ============================================================================
+// CSV Upload Exports
+// ============================================================================
+
+export { parseCsvUploadResponse, CsvUploadService } from './csvUploadService';
+export type { CsvUploadResult, CsvUploadRowError, CsvUploadRowSuccess } from './csvUploadService';
 
 // ============================================================================
 // Type Guard Utilities
