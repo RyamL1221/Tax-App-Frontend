@@ -34,6 +34,10 @@ export interface UseResetPasswordFormReturn {
 function validatePassword(password: string): string | undefined {
   if (!password) return 'Password is required';
   if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+  if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
+  if (!/\d/.test(password)) return 'Password must contain at least one digit';
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Password must contain at least one special character';
   return undefined;
 }
 
@@ -90,16 +94,12 @@ export function useResetPasswordForm(options: UseResetPasswordFormOptions): UseR
     } catch (err: any) {
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
-      if (err.status === 400) {
-        if (err.message?.toLowerCase().includes('expired')) {
-          errorMessage = 'This reset link has expired. Please request a new one.';
-        } else if (err.message?.toLowerCase().includes('already been used')) {
-          errorMessage = 'This reset link has already been used. Please request a new one.';
-        } else if (err.message?.toLowerCase().includes('invalid')) {
-          errorMessage = 'This reset link is invalid. Please request a new one.';
-        } else {
-          errorMessage = err.message || 'Invalid reset token. Please request a new reset link.';
-        }
+      if (err.status === 401) {
+        // Invalid, expired, or already-used token
+        errorMessage = 'This reset link has expired or already been used. Please request a new one.';
+      } else if (err.status === 400) {
+        // Validation errors from the backend
+        errorMessage = err.message || 'Invalid input. Please check your password and try again.';
       } else if (err.message === 'Network Error' || !err.status) {
         errorMessage = 'Unable to connect. Please check your internet connection.';
       }

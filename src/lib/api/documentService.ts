@@ -17,6 +17,7 @@ import {
   GenerateDocumentResponse,
   Form1099DivData
 } from './types';
+import { decodePdfResponse } from './pdfUtils';
 
 /**
  * DocumentService class provides document generation API methods
@@ -368,9 +369,9 @@ export class DocumentService {
           };
         }
 
-        // Convert response to blob
-        console.log('[DocumentService] Converting response to blob');
-        const blob = await response.blob();
+        // Decode base64-encoded PDF from API Gateway
+        console.log('[DocumentService] Decoding PDF response');
+        const blob = await decodePdfResponse(response);
         console.log('[DocumentService] Blob created', {
           size: blob.size,
           type: blob.type

@@ -299,8 +299,11 @@ export class AuthService {
       };
     }
 
-    // Make API request
-    const response = await this.apiClient.post<ResetPasswordResponse>('/auth/reset-password', data);
+    // Make API request — backend expects snake_case field name
+    const response = await this.apiClient.post<ResetPasswordResponse>('/auth/reset-password', {
+      token: data.token,
+      new_password: data.newPassword,
+    });
 
     // Clear existing tokens to invalidate sessions
     this.tokenManager.clearToken();
