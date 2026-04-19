@@ -15,6 +15,7 @@ import React, { useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useCsvUpload } from '@/hooks/useCsvUpload';
 import { ImportResultsView } from '@/components/forms/ImportResultsView';
+import { decodePdfResponse } from '@/lib/api/pdfUtils';
 
 
 export interface CsvUploadClientProps {
@@ -71,7 +72,7 @@ export default function CsvUploadClient({ className }: CsvUploadClientProps) {
       throw { status: response.status, message: 'Failed to download document' };
     }
 
-    const blob = await response.blob();
+    const blob = await decodePdfResponse(response);
     const blobUrl = URL.createObjectURL(blob);
 
     // Trigger browser download
