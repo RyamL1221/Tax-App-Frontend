@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { getAuthState } from '@/lib/auth/AuthCoordinator';
 import { LogoutButton } from '@/components/LogoutButton';
-import { hasToken } from '@/lib/api/tokenManager';
 
 /**
  * NavbarClient component that renders navigation links based on JWT authentication state
@@ -51,18 +50,10 @@ import { hasToken } from '@/lib/api/tokenManager';
  * ```
  */
 export default function NavbarClient(): JSX.Element {
-  // Initialize auth state synchronously from localStorage for immediate render
-  // This prevents the "flash of wrong content" issue
-  const getInitialAuthState = (): boolean => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return hasToken('NavbarClient-init');
-    } catch {
-      return false;
-    }
-  };
-
-  const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthState);
+  // Start with false on initial render to match server-side rendering.
+  // The useEffect will immediately check localStorage and update.
+  // This prevents hydration mismatches when navigating via window.location.href.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const mountedRef = useRef(true);
 

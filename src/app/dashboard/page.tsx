@@ -515,12 +515,86 @@ export default function DashboardPage() {
       }
     }
 
+    // Listen for auth-token-changed events (e.g., token cleared during logout)
+    // This mirrors the pattern used in NavbarClient for reacting to token changes
+    // Requirements: 1.1, 1.3, 2.1, 2.3
+    const handleAuthTokenChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('[Dashboard] Auth token changed event received', {
+        action: customEvent.detail?.action,
+        traceId: customEvent.detail?.traceId,
+      });
+
+      if (customEvent.detail?.action === 'clear' && isMountedRef.current) {
+        console.log('[Dashboard] Token cleared, updating auth state and redirecting', { traceId });
+        setIsAuthenticated(null);
+
+        if (!redirectInitiatedRef.current) {
+          redirectInitiatedRef.current = true;
+          const redirectUrl = '/login';
+          try {
+            router.push(redirectUrl);
+            console.log('[Dashboard] Token-clear redirect initiated', { traceId, redirectUrl });
+          } catch (navError) {
+            console.error('[Dashboard] Token-clear router.push failed, using fallback', {
+              error: navError instanceof Error ? navError.message : String(navError),
+              timestamp: new Date().toISOString(),
+              fallback: 'window.location.href',
+              traceId,
+            });
+            if (typeof window !== 'undefined') {
+              window.location.href = redirectUrl;
+            }
+          }
+        }
+      }
+    };
+
+    // Listen for logoutStateChange events (e.g., logout initiated by LogoutButton)
+    // Requirements: 1.1, 2.3, 3.1, 3.2
+    const handleLogoutStateChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      console.log('[Dashboard] Logout state change event received', {
+        state: customEvent.detail?.state,
+        traceId,
+      });
+
+      if (customEvent.detail?.state === 'in-progress' && isMountedRef.current) {
+        console.log('[Dashboard] Logout in progress, setting isLoggingOut and redirecting', { traceId });
+        setIsLoggingOut(true);
+
+        if (!redirectInitiatedRef.current) {
+          redirectInitiatedRef.current = true;
+          const redirectUrl = '/login';
+          try {
+            router.push(redirectUrl);
+            console.log('[Dashboard] Logout-state redirect initiated', { traceId, redirectUrl });
+          } catch (navError) {
+            console.error('[Dashboard] Logout-state router.push failed, using fallback', {
+              error: navError instanceof Error ? navError.message : String(navError),
+              timestamp: new Date().toISOString(),
+              fallback: 'window.location.href',
+              traceId,
+            });
+            if (typeof window !== 'undefined') {
+              window.location.href = redirectUrl;
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('auth-token-changed', handleAuthTokenChange);
+    window.addEventListener('logoutStateChange', handleLogoutStateChange);
+
     return () => {
       console.log('[Dashboard] Component unmounting', { traceId });
       isMountedRef.current = false;
       // CRITICAL: Reset authCheckInProgressRef to allow re-mount to run auth check
       // This is essential for React Strict Mode which unmounts and remounts components
       authCheckInProgressRef.current = false;
+      window.removeEventListener('auth-token-changed', handleAuthTokenChange);
+      window.removeEventListener('logoutStateChange', handleLogoutStateChange);
     };
   }, [router]);
 
