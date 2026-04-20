@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import NoScriptFallback from "@/components/fallbacks/NoScriptFallback";
 import Navbar from "@/components/Navbar";
 
 const inter = Inter({ 
@@ -66,15 +65,13 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="manifest" href="/site.webmanifest" />
       </head>
-      <body className={`${inter.className} antialiased`}>
-        <NoScriptFallback>
-          <ErrorBoundary>
-            <Navbar />
-            <div id="root">
-              {children}
-            </div>
-          </ErrorBoundary>
-        </NoScriptFallback>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
+        <ErrorBoundary>
+          <Navbar />
+          <div id="root">
+            {children}
+          </div>
+        </ErrorBoundary>
       </body>
     </html>
   );
