@@ -305,7 +305,6 @@ export default function DashboardPage() {
   useEffect(() => {
     // Prevent multiple concurrent authentication checks
     if (authCheckInProgressRef.current) {
-      console.log('[Dashboard] Authentication check already in progress, skipping');
       return;
     }
 
@@ -313,7 +312,6 @@ export default function DashboardPage() {
 
     // Get trace ID from login flow if available
     const traceId = getTraceId();
-    console.log('[Dashboard] Starting authentication check', { traceId });
 
     /**
      * Authentication Check Function
@@ -329,7 +327,6 @@ export default function DashboardPage() {
         let logoutInProgress = false;
         try {
           logoutInProgress = logoutStateManager.isLogoutInProgress();
-          console.log('[Dashboard] Logout state check result', { logoutInProgress, traceId });
         } catch (logoutCheckError) {
           console.error('[Dashboard] Error checking logout state', {
             error: logoutCheckError instanceof Error ? logoutCheckError.message : String(logoutCheckError),
@@ -357,23 +354,7 @@ export default function DashboardPage() {
         }
         
         // Use AuthCoordinator for unified authentication state with JWT requirement
-        console.log('[Dashboard] Getting unified auth state with JWT requirement', { traceId });
         const authState = await getAuthState({ requireJWT: true, traceId: traceId || undefined });
-        console.log('[Dashboard] Auth state received', { 
-          isAuthenticated: authState.isAuthenticated,
-          authMethod: authState.authMethod,
-          inFallbackMode: authState.inFallbackMode,
-          reason: authState.reason,
-          traceId,
-        });
-        
-        // DEBUG: Log the exact boolean value and type
-        console.log('[Dashboard] Checking authentication - isAuthenticated value:', {
-          value: authState.isAuthenticated,
-          type: typeof authState.isAuthenticated,
-          negated: !authState.isAuthenticated,
-          traceId,
-        });
         
         if (!authState.isAuthenticated) {
           // Not authenticated - redirect to login with return URL
@@ -390,15 +371,9 @@ export default function DashboardPage() {
               }
             }
             
-            console.log('[Dashboard] Redirecting to login (not authenticated)', { 
-              traceId,
-              reason: authState.reason,
-              redirectUrl,
-            });
             
             try {
               router.push(redirectUrl);
-              console.log('[Dashboard] Redirect initiated successfully', { traceId, redirectUrl });
             } catch (navError) {
               console.error('[Dashboard] router.push failed, using fallback', {
                 error: navError instanceof Error ? navError.message : String(navError),
@@ -409,19 +384,11 @@ export default function DashboardPage() {
               });
               if (typeof window !== 'undefined') {
                 window.location.href = redirectUrl;
-                console.log('[Dashboard] Fallback redirect initiated successfully', { traceId, redirectUrl });
               }
             }
           }
         } else {
           // Authenticated - show dashboard
-          console.log('[Dashboard] Entering authenticated branch', { traceId });
-          console.log('[Dashboard] Authentication successful', { 
-            authMethod: authState.authMethod,
-            inFallbackMode: authState.inFallbackMode,
-            traceId,
-          });
-          
           try {
             setIsAuthenticated(true);
           } catch (stateError) {
@@ -466,9 +433,7 @@ export default function DashboardPage() {
             }
             
             try {
-              console.log('[Dashboard] Redirecting to login (error recovery)', { traceId, redirectUrl });
               router.push(redirectUrl);
-              console.log('[Dashboard] Error recovery redirect initiated successfully', { traceId, redirectUrl });
             } catch (navError) {
               console.error('[Dashboard] Error recovery navigation failed, using fallback', {
                 error: navError instanceof Error ? navError.message : String(navError),
@@ -479,7 +444,6 @@ export default function DashboardPage() {
               });
               if (typeof window !== 'undefined') {
                 window.location.href = redirectUrl;
-                console.log('[Dashboard] Fallback error recovery redirect initiated successfully', { traceId, redirectUrl });
               }
             }
           }
@@ -510,7 +474,6 @@ export default function DashboardPage() {
           redirectUrl = `/login?returnUrl=${encodeURIComponent('/dashboard?' + currentParams.toString())}`;
         }
         
-        console.log('[Dashboard] Critical error redirect URL', { redirectUrl, traceId });
         window.location.href = redirectUrl;
       }
     }
@@ -520,13 +483,8 @@ export default function DashboardPage() {
     // Requirements: 1.1, 1.3, 2.1, 2.3
     const handleAuthTokenChange = (e: Event) => {
       const customEvent = e as CustomEvent;
-      console.log('[Dashboard] Auth token changed event received', {
-        action: customEvent.detail?.action,
-        traceId: customEvent.detail?.traceId,
-      });
 
       if (customEvent.detail?.action === 'clear' && isMountedRef.current) {
-        console.log('[Dashboard] Token cleared, updating auth state and redirecting', { traceId });
         setIsAuthenticated(null);
 
         if (!redirectInitiatedRef.current) {
@@ -534,7 +492,6 @@ export default function DashboardPage() {
           const redirectUrl = '/login';
           try {
             router.push(redirectUrl);
-            console.log('[Dashboard] Token-clear redirect initiated', { traceId, redirectUrl });
           } catch (navError) {
             console.error('[Dashboard] Token-clear router.push failed, using fallback', {
               error: navError instanceof Error ? navError.message : String(navError),
@@ -554,13 +511,8 @@ export default function DashboardPage() {
     // Requirements: 1.1, 2.3, 3.1, 3.2
     const handleLogoutStateChange = (e: Event) => {
       const customEvent = e as CustomEvent;
-      console.log('[Dashboard] Logout state change event received', {
-        state: customEvent.detail?.state,
-        traceId,
-      });
 
       if (customEvent.detail?.state === 'in-progress' && isMountedRef.current) {
-        console.log('[Dashboard] Logout in progress, setting isLoggingOut and redirecting', { traceId });
         setIsLoggingOut(true);
 
         if (!redirectInitiatedRef.current) {
@@ -568,7 +520,6 @@ export default function DashboardPage() {
           const redirectUrl = '/login';
           try {
             router.push(redirectUrl);
-            console.log('[Dashboard] Logout-state redirect initiated', { traceId, redirectUrl });
           } catch (navError) {
             console.error('[Dashboard] Logout-state router.push failed, using fallback', {
               error: navError instanceof Error ? navError.message : String(navError),
@@ -588,7 +539,6 @@ export default function DashboardPage() {
     window.addEventListener('logoutStateChange', handleLogoutStateChange);
 
     return () => {
-      console.log('[Dashboard] Component unmounting', { traceId });
       isMountedRef.current = false;
       // CRITICAL: Reset authCheckInProgressRef to allow re-mount to run auth check
       // This is essential for React Strict Mode which unmounts and remounts components

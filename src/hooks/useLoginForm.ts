@@ -188,15 +188,12 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
    */
   const onSubmit = useCallback(async (data: LoginFormData, event?: React.BaseSyntheticEvent) => {
     // Defensive: Explicitly prevent default form behavior (Requirements 1.1, 9.1, 9.2)
-    console.log('Form submission started');
     if (event) {
       event.preventDefault();
-      console.log('Default behavior prevented');
     }
 
     // Generate trace ID for this login flow
     const traceId = startTrace();
-    console.log('[useLoginForm] Login flow started', { traceId });
     
     // Clear any previous status
     setStatus({ state: 'idle', message: '' });
@@ -216,7 +213,6 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
     
     try {
       // Call authentication API using authService with status callback and trace ID
-      console.log('[useLoginForm] Calling API client login method', { traceId });
       const result = await authService.login(
         {
           email: data.email,
@@ -232,19 +228,17 @@ export function useLoginForm(options: UseLoginFormOptions = {}): UseLoginFormRet
       // Check if login was successful
       if (result.success) {
         // Token is automatically stored and verified by authService
-        console.log('[useLoginForm] Login successful, token stored and verified', { traceId });
+        console.log('Login successful');
         resetRateLimit();
         
         // Wait 500ms to show success message before redirecting (Requirement 7.1, 7.2)
         setTimeout(() => {
-          console.log('[useLoginForm] Initiating redirect to dashboard', { traceId });
           if (onSuccess) {
             onSuccess('/dashboard');
           }
         }, 500);
       } else {
         // Login failed - handle error
-        console.error('[useLoginForm] Login failed', { error: result.error, traceId });
         
         // Record attempt for authentication errors
         if (result.error === 'Invalid email or password') {

@@ -42,6 +42,8 @@ export function LogoutButton({ className }: LogoutButtonProps): JSX.Element {
     // doesn't see stale "in-progress" state in sessionStorage
     logoutStateManager.clearLogoutState();
 
+    console.log('Logout successful');
+
     // Use hard navigation — soft navigation (router.push) is unreliable
     // after auth state changes and can leave the UI stuck
     window.location.href = '/login';

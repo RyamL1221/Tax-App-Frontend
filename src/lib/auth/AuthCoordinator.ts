@@ -94,29 +94,16 @@ export interface ExtendedAuthState extends AuthState {
  * Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 6.1, 6.2
  */
 export async function getAuthState(options?: AuthOptions | string): Promise<ExtendedAuthState> {
-  const timestamp = new Date().toISOString();
-  
   // Support both old signature (traceId as string) and new signature (options object)
   const opts: AuthOptions = typeof options === 'string' 
     ? { traceId: options } 
     : (options || {});
   
   const { traceId } = opts;
-  
-  console.log('[AuthCoordinator] Getting auth state (JWT-only mode)', { 
-    traceId,
-    timestamp
-  });
 
   try {
     // Check JWT in localStorage
     const hasJWT = hasToken('AuthCoordinator', traceId);
-    
-    console.log('[AuthCoordinator] JWT check result', { 
-      hasJWT, 
-      traceId,
-      timestamp: new Date().toISOString()
-    });
 
     if (hasJWT) {
       // Authenticated via JWT
@@ -130,12 +117,6 @@ export async function getAuthState(options?: AuthOptions | string): Promise<Exte
         authMethod: 'jwt',
       };
 
-      console.log('[AuthCoordinator] Authenticated via JWT', { 
-        state, 
-        traceId,
-        timestamp: new Date().toISOString()
-      });
-      
       logAuthEvent('Authentication state determined: JWT', 'info', state, { traceId });
       return state;
     }
@@ -152,12 +133,6 @@ export async function getAuthState(options?: AuthOptions | string): Promise<Exte
       reason: 'No JWT token found',
     };
 
-    console.log('[AuthCoordinator] Not authenticated (no JWT)', { 
-      state, 
-      traceId,
-      timestamp: new Date().toISOString()
-    });
-    
     logAuthEvent('Authentication state determined: Not authenticated', 'info', state, { traceId });
     return state;
   } catch (error) {
@@ -198,7 +173,6 @@ export async function getAuthState(options?: AuthOptions | string): Promise<Exte
  */
 export function activateFallbackMode(_reason: string, _traceId?: string): void {
   // No-op: Fallback mode has been removed
-  console.log('[AuthCoordinator] activateFallbackMode called (no-op - fallback mode removed)');
 }
 
 /**
@@ -224,7 +198,6 @@ export function isInFallbackMode(): boolean {
  */
 export function deactivateFallbackMode(_traceId?: string): void {
   // No-op: Fallback mode has been removed
-  console.log('[AuthCoordinator] deactivateFallbackMode called (no-op - fallback mode removed)');
 }
 
 /**

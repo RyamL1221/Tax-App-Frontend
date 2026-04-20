@@ -54,9 +54,8 @@ function deriveUserId(token: string, email: string): string {
     
     // Fallback to email if userId not in payload or is empty
     return email;
-  } catch (error) {
+  } catch {
     // If JWT decoding fails, use email as userId
-    console.warn('Failed to decode JWT token, using email as userId:', error);
     return email;
   }
 }
@@ -137,8 +136,6 @@ export class AuthService {
     traceId?: string
   ): Promise<LoginResult> {
     try {
-      console.log('[AuthService] Login attempt', { email: data.email, traceId });
-
       // Validate email format
       const emailValidation = Validators.validateEmail(data.email);
       if (!emailValidation.isValid) {
@@ -165,13 +162,7 @@ export class AuthService {
       onStatusChange?.({ state: 'authenticating', message: 'Authenticating...' });
 
       // Make API request to backend
-      console.log('[AuthService] Calling backend API', { traceId });
       const response = await this.apiClient.post<LoginResponse>('/auth/login', data);
-      console.log('[AuthService] Backend response received', { 
-        hasToken: !!response.token,
-        email: response.email,
-        traceId 
-      });
 
       // Extract fields from response
       const { token, email: responseEmail, userId: responseUserId } = response;
@@ -193,7 +184,6 @@ export class AuthService {
 
       // Store JWT token with verification
       // Requirements: 6.1, 10.1, 10.2
-      console.log('[AuthService] Storing JWT token', { traceId });
       const stored = await this.tokenManager.setToken(token, 'authService_login', traceId);
 
       if (!stored) {
@@ -201,16 +191,12 @@ export class AuthService {
         throw new Error('Failed to store authentication token. Please try again.');
       }
 
-      console.log('[AuthService] Token stored successfully', { traceId });
-
       // Verify token is retrievable
       const retrieved = this.tokenManager.getToken('authService_login_verify', traceId);
       if (!retrieved) {
         console.error('[AuthService] Token verification failed', { traceId });
         throw new Error('Failed to verify authentication token. Please try again.');
       }
-
-      console.log('[AuthService] Token verified successfully', { traceId });
 
       // Notify success state
       onStatusChange?.({ state: 'success', message: 'Login successful!' });
