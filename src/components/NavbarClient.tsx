@@ -130,7 +130,7 @@ export default function NavbarClient(): JSX.Element {
   }, [checkAuthState, isLoading]);
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-gray-900 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand and Home Link */}
@@ -138,7 +138,7 @@ export default function NavbarClient(): JSX.Element {
           <div className="flex items-center flex-shrink-0">
             <Link 
               href="/" 
-              className="text-lg sm:text-xl font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200"
+              className="text-lg sm:text-xl font-semibold text-white hover:text-blue-300 transition-colors duration-200"
             >
               Home
             </Link>
@@ -151,13 +151,13 @@ export default function NavbarClient(): JSX.Element {
               <>
                 <Link
                   href="/login"
-                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors duration-200"
+                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-200 hover:text-white hover:bg-gray-700 rounded-md transition-colors duration-200"
                 >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-600 text-white hover:bg-blue-700 rounded-md transition-colors duration-200 font-medium"
+                  className="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-600 text-white hover:bg-blue-500 rounded-md transition-colors duration-200 font-medium"
                 >
                   Register
                 </Link>
@@ -169,11 +169,11 @@ export default function NavbarClient(): JSX.Element {
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <Link
                   href="/dashboard"
-                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors duration-200"
+                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-200 hover:text-white hover:bg-gray-700 rounded-md transition-colors duration-200"
                 >
                   Dashboard
                 </Link>
-                <LogoutButton />
+                <LogoutButton className="border-gray-400 text-gray-200 hover:bg-gray-700 hover:text-white" />
               </div>
             )}
           </div>
