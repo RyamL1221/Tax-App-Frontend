@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 import { CsvUploadSection } from '@/components/forms/CsvUploadSection';
 import { FormAuthGuard } from '@/components/auth/FormAuthGuard';
-import Form1099DivClient from '@/app/forms/1099-div/Form1099DivClient';
+
+// Lazy-load Form1099DivClient to avoid circular module dependency
+// (this component lives in src/components but Form1099DivClient lives in src/app)
+const Form1099DivClient = lazy(() => import('@/app/forms/1099-div/Form1099DivClient'));
 
 export type MethodSelection = null | 'csv' | 'manual';
 
@@ -132,7 +135,9 @@ export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelect
           <h2 className="text-2xl font-bold text-gray-900 mt-2">Fill Out Form</h2>
         </div>
         <FormAuthGuard>
-          <Form1099DivClient initialToken={null} />
+          <Suspense fallback={<div className="animate-pulse h-64 bg-gray-100 rounded-lg" />}>
+            <Form1099DivClient initialToken={null} />
+          </Suspense>
         </FormAuthGuard>
       </div>
     );
