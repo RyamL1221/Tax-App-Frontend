@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
+import { CsvUploadSection } from '@/components/forms/CsvUploadSection';
+import { FormAuthGuard } from '@/components/auth/FormAuthGuard';
+import Form1099DivClient from '@/app/forms/1099-div/Form1099DivClient';
 
 export type MethodSelection = null | 'csv' | 'manual';
 
@@ -18,8 +21,8 @@ export interface Form1099DivMethodSelectorProps {
  * and Fill Out Form workflows for 1099-DIV submission.
  *
  * Cards are interactive, accessible, and keyboard-navigable.
- * Once a method is selected, the component transitions to show
- * the selected workflow content (handled by Subtask 2).
+ * Once a method is selected, the unselected card disappears and the
+ * corresponding workflow content renders with a "Change method" control.
  */
 export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelectorProps) {
   const [selectedMethod, setSelectedMethod] = useState<MethodSelection>(null);
@@ -35,13 +38,47 @@ export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelect
     }
   };
 
-  // Placeholder for selected state — full content switching built in Subtask 2
-  if (selectedMethod !== null) {
+  const handleChangeMethod = () => {
+    setSelectedMethod(null);
+  };
+
+  // Render selected method content
+  if (selectedMethod === 'csv') {
     return (
-      <div className={cn('w-full', className)}>
-        <p className="text-sm text-gray-600 mb-4">
-          Selected method: <span data-testid="selected-method" className="font-medium">{selectedMethod}</span>
-        </p>
+      <div className={cn('w-full transition-opacity duration-200', className)}>
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={handleChangeMethod}
+            className="text-sm text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:underline"
+            data-testid="change-method-button"
+          >
+            &larr; Change method
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900 mt-2">CSV Bulk Upload</h2>
+        </div>
+        <CsvUploadSection />
+      </div>
+    );
+  }
+
+  if (selectedMethod === 'manual') {
+    return (
+      <div className={cn('w-full transition-opacity duration-200', className)}>
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={handleChangeMethod}
+            className="text-sm text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:underline"
+            data-testid="change-method-button"
+          >
+            &larr; Change method
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900 mt-2">Fill Out Form</h2>
+        </div>
+        <FormAuthGuard>
+          <Form1099DivClient initialToken={null} />
+        </FormAuthGuard>
       </div>
     );
   }
