@@ -43,29 +43,13 @@ const csvUploadLinks: AssetLink[] = [
     fileName: 'full-template.csv',
     ariaLabel: 'Download Full CSV Template',
   },
-  {
-    label: 'Preview Blank 1099-DIV Form',
-    url: FORM_1099_DIV_URLS.blankForm,
-    action: 'preview',
-    fileName: '1099-DIV.pdf',
-    ariaLabel: 'Preview Blank 1099-DIV Form',
-    assetType: 'pdf',
-    assetId: 'blank-form',
-  },
-  {
-    label: 'Download Blank 1099-DIV Form',
-    url: FORM_1099_DIV_URLS.blankForm,
-    action: 'download',
-    fileName: '1099-DIV.pdf',
-    ariaLabel: 'Download Blank 1099-DIV Form',
-  },
 ];
 
 /**
  * CsvUploadSection Component
  *
  * Renders the CSV Bulk Upload section with preview and download links
- * for Simple CSV Template, Full CSV Template, and Blank 1099-DIV Form.
+ * for Simple CSV Template and Full CSV Template.
  * All links are static CloudFront URLs — no backend calls involved.
  */
 export function CsvUploadSection({ className }: CsvUploadSectionProps) {
@@ -84,10 +68,6 @@ export function CsvUploadSection({ className }: CsvUploadSectionProps) {
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
         <CsvUploadClient />
       </div>
-
-      <p className="text-xs text-gray-500 italic">
-        Note: The blank 1099-DIV form is provided for reference purposes only.
-      </p>
     </section>
   );
 }
