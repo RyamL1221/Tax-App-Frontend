@@ -33,11 +33,11 @@ export default function Form1099DivPage() {
             </p>
           </div>
 
-          {/* Method Selector (CSV Bulk Upload / Fill Out Form) */}
-          <Form1099DivMethodSelector className="mb-8" />
-
           {/* Always-visible blank form reference */}
-          <BlankFormReferenceSection />
+          <BlankFormReferenceSection className="mb-8" />
+
+          {/* Method Selector (CSV Bulk Upload / Fill Out Form) */}
+          <Form1099DivMethodSelector />
         </div>
       </div>
     </div>
