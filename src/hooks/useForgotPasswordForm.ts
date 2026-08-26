@@ -179,13 +179,19 @@ export function useForgotPasswordForm(
           `Too many requests. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`
         );
         onError?.('Rate limit exceeded');
+      } else if (err.status === 400) {
+        // 400 = email format validation failure from the backend.
+        // Safe to surface because it's a format check, not an account-existence leak.
+        setError(err.message || 'Please provide a valid email address');
+        onError?.(err.message || 'Validation error');
       } else if (err.message === 'Network Error' || !err.status) {
-        // Handle network errors (Requirement 1.5)
+        // Handle network errors (fetch threw, backend unreachable) (Requirement 1.5)
         setError('Unable to connect. Please check your internet connection.');
         onError?.('Network error');
       } else {
-        // For all other errors, show success to prevent user enumeration (Requirement 1.4, 12.5)
-        // This includes 404 (email not found) which the backend may return
+        // For all other errors (401, 404, 500, etc.), show generic success to prevent
+        // user enumeration (Requirement 1.4, 12.5). This ensures a 404 (email not found)
+        // or 500 (server issue) never reveals whether an account exists.
         setIsSuccess(true);
         onSuccess?.();
       }
