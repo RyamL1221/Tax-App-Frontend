@@ -46,8 +46,7 @@ export function InlinePreviewPanel({
     setErrorMessage('');
 
     try {
-      const proxyUrl = `/api/proxy/csv?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
+      const response = await fetch(url);
       if (!response.ok) {
         setErrorMessage(`Failed to load preview (HTTP ${response.status})`);
         setState('error');

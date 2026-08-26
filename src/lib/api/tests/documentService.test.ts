@@ -15,7 +15,7 @@ import { ApiClient } from '../apiClient';
 import { GenerateDocumentRequest, GenerateDocumentResponse, Form1099DivData } from '../types';
 
 // Mock the ApiClient
-jest.mock('./apiClient');
+jest.mock('../apiClient');
 
 describe('DocumentService', () => {
   let documentService: DocumentService;
@@ -507,6 +507,9 @@ describe('DocumentService', () => {
     const mockToken = 'mock-jwt-token';
 
     beforeEach(() => {
+      // Set the backend API URL for direct calls
+      process.env.NEXT_PUBLIC_API_URL = 'http://localhost:3000';
+
       // Mock fetch globally
       global.fetch = jest.fn();
       
@@ -529,7 +532,7 @@ describe('DocumentService', () => {
       jest.restoreAllMocks();
     });
 
-    it('should download PDF with authentication via proxy', async () => {
+    it('should download PDF with authentication via direct backend URL', async () => {
       const mockBlob = new Blob(['PDF content'], { type: 'application/pdf' });
       const mockResponse = {
         ok: true,
@@ -549,9 +552,9 @@ describe('DocumentService', () => {
 
       const result = await documentService.downloadDocument(mockJobId);
 
-      // Should call fetch with proxy URL and headers
+      // Should call fetch with direct backend URL and auth headers
       expect(global.fetch).toHaveBeenCalledWith(
-        `/api/proxy/download/${mockJobId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/documents/download/${mockJobId}`,
         expect.objectContaining({
           method: 'GET',
           headers: {

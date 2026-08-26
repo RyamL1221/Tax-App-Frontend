@@ -1,9 +1,19 @@
 /**
  * CloudFront base URL for static assets.
  * Reads from NEXT_PUBLIC_CLOUDFRONT_BASE_URL env var, defaults to empty string.
+ * Ensures the URL always has a protocol prefix to prevent relative URL resolution.
  */
+function normalizeBaseUrl(raw: string): string {
+  if (!raw) return '';
+  // If the URL has no protocol, prepend https://
+  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+    return `https://${raw}`;
+  }
+  return raw;
+}
+
 export const CLOUDFRONT_BASE_URL: string =
-  process.env.NEXT_PUBLIC_CLOUDFRONT_BASE_URL ?? '';
+  normalizeBaseUrl(process.env.NEXT_PUBLIC_CLOUDFRONT_BASE_URL ?? '');
 
 /**
  * Asset paths organized by form type.

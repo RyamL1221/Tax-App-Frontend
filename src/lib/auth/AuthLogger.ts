@@ -77,46 +77,11 @@ function formatTimestamp(timestamp: number): string {
 
 /**
  * Core logging function
- * Logs to console in development, minimal logging in production
+ * Silenced for production - all auth logging is disabled
  */
-function log(entry: AuthLogEntry): void {
-  const { timestamp, level, event, traceId, authState, context } = entry;
-  const formattedTime = formatTimestamp(timestamp);
-  
-  // Check logout state and add to context
-  const logoutInProgress = logoutStateManager.isLogoutInProgress();
-  const enhancedContext = {
-    ...context,
-    logoutInProgress,
-    ...(traceId && { traceId }),
-  };
-  
-  // In production, only log warnings and errors
-  if (!isDevelopment() && level !== 'warn' && level !== 'error') {
-    return;
-  }
-  
-  // Build log message with trace ID if available
-  const prefix = `[AuthLogger ${formattedTime}]`;
-  const traceInfo = traceId ? ` [Trace: ${traceId}]` : '';
-  const message = `${prefix}${traceInfo} ${event}`;
-  
-  // Select console method based on level
-  const consoleMethod = level === 'error' ? console.error : 
-                       level === 'warn' ? console.warn : 
-                       console.log;
-  
-  // In development, log full details
-  if (isDevelopment()) {
-    consoleMethod(message, {
-      level,
-      authState,
-      context: enhancedContext,
-    });
-  } else {
-    // In production, log minimal info
-    consoleMethod(message);
-  }
+function log(_entry: AuthLogEntry): void {
+  // No-op: Auth logging silenced for production
+  return;
 }
 
 /**

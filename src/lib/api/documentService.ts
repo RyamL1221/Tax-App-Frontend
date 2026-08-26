@@ -17,6 +17,7 @@ import {
   GenerateDocumentResponse,
   Form1099DivData
 } from './types';
+import { decodePdfResponse } from './pdfUtils';
 
 /**
  * DocumentService class provides document generation API methods
@@ -270,20 +271,18 @@ export class DocumentService {
    * Downloads a generated PDF document with authentication
    * 
    * Fetches the PDF from the backend using the jobId and JWT token.
-   * Uses a Next.js API proxy route to bypass CORS issues.
+   * Fetches directly from the backend API.
    * Returns a blob URL that can be used to display the PDF in an iframe
    * or trigger a download.
    * 
    * Timeout Behavior:
    * - Client timeout: 35 seconds
-   * - Proxy timeout: 30 seconds
-   * - If the backend takes longer than 30 seconds, the proxy returns 504
    * - If the entire request takes longer than 35 seconds, client aborts with 504
    * 
    * Error Handling:
    * - 401: Missing or invalid authentication token
    * - 504: Request timeout (backend or network took too long)
-   * - Other status codes: Forwarded from backend/proxy
+   * - Other status codes: Forwarded from backend
    * 
    * @param jobId - The job ID for the generated document (UUID)
    * @returns Promise resolving to a blob URL for the PDF
@@ -297,9 +296,8 @@ export class DocumentService {
       timestamp: new Date().toISOString()
     });
 
-    // Use Next.js API proxy route to bypass CORS issues
-    // The proxy route forwards the request to the backend with authentication
-    const downloadUrl = `/api/proxy/download/${jobId}`;
+    // Fetch directly from the backend API
+    const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL}/documents/download/${jobId}`;
 
     // Get the JWT token from storage
     const token = typeof window !== 'undefined' ? localStorage.getItem('jwt_token') : null;
@@ -318,16 +316,16 @@ export class DocumentService {
     try {
       // Create abort controller for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 second timeout (slightly longer than proxy)
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 second timeout
 
-      console.log('[DocumentService] Fetching from proxy', { 
+      console.log('[DocumentService] Fetching PDF', { 
         downloadUrl,
         hasAuthHeader: true,
         timeout: '35s'
       });
 
       try {
-        // Fetch the PDF with authentication via proxy
+        // Fetch the PDF with authentication
         const response = await fetch(downloadUrl, {
           method: 'GET',
           headers: {
@@ -339,7 +337,7 @@ export class DocumentService {
 
         clearTimeout(timeoutId);
 
-        console.log('[DocumentService] Proxy response received', {
+        console.log('[DocumentService] Download response received', {
           status: response.status,
           statusText: response.statusText,
           contentType: response.headers.get('Content-Type'),
@@ -349,7 +347,7 @@ export class DocumentService {
         // Handle errors
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('[DocumentService] Error response from proxy', {
+          console.error('[DocumentService] Error response from backend', {
             status: response.status,
             statusText: response.statusText,
             body: errorText
@@ -371,9 +369,9 @@ export class DocumentService {
           };
         }
 
-        // Convert response to blob
-        console.log('[DocumentService] Converting response to blob');
-        const blob = await response.blob();
+        // Decode base64-encoded PDF from API Gateway
+        console.log('[DocumentService] Decoding PDF response');
+        const blob = await decodePdfResponse(response);
         console.log('[DocumentService] Blob created', {
           size: blob.size,
           type: blob.type

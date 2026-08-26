@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { getAuthState } from '@/lib/auth/AuthCoordinator';
 import { LogoutButton } from '@/components/LogoutButton';
-import { hasToken } from '@/lib/api/tokenManager';
 
 /**
  * NavbarClient component that renders navigation links based on JWT authentication state
@@ -51,18 +50,10 @@ import { hasToken } from '@/lib/api/tokenManager';
  * ```
  */
 export default function NavbarClient(): JSX.Element {
-  // Initialize auth state synchronously from localStorage for immediate render
-  // This prevents the "flash of wrong content" issue
-  const getInitialAuthState = (): boolean => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return hasToken('NavbarClient-init');
-    } catch {
-      return false;
-    }
-  };
-
-  const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthState);
+  // Start with false on initial render to match server-side rendering.
+  // The useEffect will immediately check localStorage and update.
+  // This prevents hydration mismatches when navigating via window.location.href.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const mountedRef = useRef(true);
 
@@ -80,7 +71,6 @@ export default function NavbarClient(): JSX.Element {
       
       // Only update state if component is still mounted
       if (mountedRef.current) {
-        console.log('[NavbarClient] Auth state received:', authState);
         setIsAuthenticated(authState.isAuthenticated);
         setIsLoading(false);
       }
@@ -106,7 +96,6 @@ export default function NavbarClient(): JSX.Element {
     // If auth check takes longer than 2 seconds, show unauthenticated state
     const timeoutId = setTimeout(() => {
       if (mountedRef.current && isLoading) {
-        console.warn('[NavbarClient] Auth check timeout - defaulting to unauthenticated');
         setIsLoading(false);
       }
     }, 2000);
@@ -118,10 +107,6 @@ export default function NavbarClient(): JSX.Element {
     // Requirements: 5.2 - Update display immediately when authentication state changes
     const handleAuthTokenChange = (e: Event) => {
       const customEvent = e as CustomEvent;
-      console.log('[NavbarClient] Auth token changed event received', {
-        action: customEvent.detail?.action,
-        traceId: customEvent.detail?.traceId,
-      });
       checkAuthState();
     };
     
@@ -129,10 +114,6 @@ export default function NavbarClient(): JSX.Element {
     const handleStorageChange = (e: StorageEvent) => {
       // Check if the jwt_token key changed (matches TOKEN_STORAGE_KEY in tokenManager)
       if (e.key === 'jwt_token' || e.key === null) {
-        console.log('[NavbarClient] Storage event detected, re-checking auth state', {
-          key: e.key,
-          newValue: e.newValue ? 'present' : 'null',
-        });
         checkAuthState();
       }
     };
@@ -149,7 +130,7 @@ export default function NavbarClient(): JSX.Element {
   }, [checkAuthState, isLoading]);
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-gray-900 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo/Brand and Home Link */}
@@ -157,7 +138,7 @@ export default function NavbarClient(): JSX.Element {
           <div className="flex items-center flex-shrink-0">
             <Link 
               href="/" 
-              className="text-lg sm:text-xl font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200"
+              className="flex items-center text-lg sm:text-xl font-semibold text-white hover:text-blue-300 transition-colors duration-200"
             >
               Home
             </Link>
@@ -170,13 +151,13 @@ export default function NavbarClient(): JSX.Element {
               <>
                 <Link
                   href="/login"
-                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors duration-200"
+                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-200 hover:text-white hover:bg-gray-700 rounded-md transition-colors duration-200"
                 >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-600 text-white hover:bg-blue-700 rounded-md transition-colors duration-200 font-medium"
+                  className="px-3 py-2 sm:px-4 text-sm sm:text-base bg-blue-600 text-white hover:bg-blue-500 rounded-md transition-colors duration-200 font-medium"
                 >
                   Register
                 </Link>
@@ -188,11 +169,11 @@ export default function NavbarClient(): JSX.Element {
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <Link
                   href="/dashboard"
-                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors duration-200"
+                  className="px-3 py-2 sm:px-4 text-sm sm:text-base text-gray-200 hover:text-white hover:bg-gray-700 rounded-md transition-colors duration-200"
                 >
                   Dashboard
                 </Link>
-                <LogoutButton />
+                <LogoutButton className="border-gray-400 text-gray-200 hover:bg-gray-700 hover:text-white" />
               </div>
             )}
           </div>

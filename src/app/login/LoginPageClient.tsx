@@ -143,8 +143,6 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
         
         if (!mountedRef.current) return;
         
-        console.log('[LoginPageClient] Auth state:', authState);
-        
         // Check for saved form data first
         const formType = '1099-DIV';
         const hasSavedData = hasSavedFormData(formType);
@@ -175,18 +173,16 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
         if (authState.isAuthenticated && !hasSavedData && !arrivedViaRedirect) {
           // Check for redirect loop before auto-redirecting
           if (detectRedirectLoop()) {
-            console.warn('[LoginPageClient] Redirect loop detected, stopping auto-redirect and showing login form');
             return;
           }
           
-          console.log('[LoginPageClient] User already authenticated (organic visit), redirecting to dashboard');
           recordRedirect();
           router.push('/dashboard');
           return;
         }
         
         if (authState.isAuthenticated && arrivedViaRedirect) {
-          console.log('[LoginPageClient] User authenticated but arrived via redirect (callbackUrl=%s, expired=%s) — showing login form to prevent redirect loop', callbackUrl, expired);
+          // User authenticated but arrived via redirect — show login form to prevent redirect loop
         }
       } catch (error) {
         console.error('[LoginPageClient] Error checking auth state:', error);
@@ -200,7 +196,6 @@ export default function LoginPageClient({ callbackUrl, expired }: LoginPageClien
     // Requirements: 7.5 (jwt-only-authentication)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'jwt_token') {
-        console.log('[LoginPageClient] JWT token changed in another tab, re-checking auth');
         checkAuth();
       }
     };

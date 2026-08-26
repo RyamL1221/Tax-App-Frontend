@@ -197,29 +197,17 @@ export function isValidToken(token: string | null, source?: string, traceId?: st
  * Requirements: 1.1, 1.2, 1.3, 1.4, 6.2, 6.5, 10.1, 10.2
  */
 export async function setToken(token: string, source?: string, traceId?: string): Promise<boolean> {
-  // Log storage attempt with storage key and trace ID
-  console.log('[TokenManager] setToken attempt', {
-    storageKey: TOKEN_STORAGE_KEY,
-    source,
-    traceId,
-    timestamp: new Date().toISOString(),
-  });
-
   // Validate token is non-empty string
   if (!isValidToken(token)) {
     logTokenOperation('set', false, 'Invalid token format: empty or null', source, traceId);
-    console.warn('TokenManager: Attempted to store invalid token (token value not logged for security)');
     return false;
   }
 
   // Validate JWT format (three base64 segments with dots)
   if (!validateTokenFormat(token)) {
     logTokenOperation('set', false, 'Invalid token format: does not match JWT structure', source, traceId);
-    console.warn('TokenManager: Token does not match JWT format (token value not logged for security)');
     return false;
   }
-
-  console.log('[TokenManager] Token format validation passed', { traceId });
 
   // Attempt storage with retry logic
   const maxAttempts = 2;
@@ -228,16 +216,10 @@ export async function setToken(token: string, source?: string, traceId?: string)
       if (typeof window !== 'undefined' && window.localStorage) {
         // Attempt to store token
         localStorage.setItem(TOKEN_STORAGE_KEY, token.trim());
-        console.log('[TokenManager] localStorage.setItem succeeded', {
-          storageKey: TOKEN_STORAGE_KEY,
-          attempt,
-          traceId,
-        });
 
         // Immediate verification - retrieve and compare
         const retrieved = localStorage.getItem(TOKEN_STORAGE_KEY);
         if (retrieved === token.trim()) {
-          console.log('[TokenManager] Immediate verification passed', { traceId });
           logTokenOperation('set', true, undefined, source, traceId);
           
           // Dispatch custom event to notify components of token change
@@ -247,7 +229,6 @@ export async function setToken(token: string, source?: string, traceId?: string)
               detail: { action: 'set', traceId }
             });
             window.dispatchEvent(event);
-            console.log('[TokenManager] Dispatched auth-token-changed event', { traceId });
           }
           
           return true;
@@ -260,7 +241,6 @@ export async function setToken(token: string, source?: string, traceId?: string)
           });
           
           if (attempt < maxAttempts) {
-            console.log('[TokenManager] Retrying storage after verification failure', { traceId });
             await new Promise(resolve => setTimeout(resolve, 100));
             continue;
           }
@@ -270,7 +250,6 @@ export async function setToken(token: string, source?: string, traceId?: string)
         }
       } else {
         logTokenOperation('set', false, 'localStorage not available', source, traceId);
-        console.error('[TokenManager] localStorage not available');
         return false;
       }
     } catch (error) {
@@ -297,11 +276,6 @@ export async function setToken(token: string, source?: string, traceId?: string)
 
       // Retry for other errors
       if (attempt < maxAttempts) {
-        console.log('[TokenManager] Retrying storage after error', {
-          attempt,
-          nextAttempt: attempt + 1,
-          traceId,
-        });
         await new Promise(resolve => setTimeout(resolve, 100));
       } else {
         logTokenOperation('set', false, `Storage error after ${maxAttempts} attempts: ${errorMessage}`, source, traceId);
@@ -329,47 +303,22 @@ export async function setToken(token: string, source?: string, traceId?: string)
  * Requirements: 1.4, 1.5, 2.1, 2.2, 2.3, 10.3, 10.4
  */
 export function getToken(source?: string, traceId?: string): string | null {
-  // Log retrieval attempt with storage key and trace ID
-  console.log('[TokenManager] getToken attempt', {
-    storageKey: TOKEN_STORAGE_KEY,
-    source,
-    traceId,
-    timestamp: new Date().toISOString(),
-  });
-
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       // Retrieve raw value from localStorage
       const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-      
-      // Log raw value retrieved (truncated for security)
-      console.log('[TokenManager] Raw value retrieved', {
-        storageKey: TOKEN_STORAGE_KEY,
-        valuePresent: token !== null,
-        valueLength: token?.length || 0,
-        valuePreview: token ? `${token.substring(0, 20)}...` : 'null',
-        traceId,
-      });
       
       // Validate token before returning
       if (!isValidToken(token)) {
         if (token !== null) {
           // Check if logout is in progress before logging error
           if (!logoutStateManager.isLogoutInProgress()) {
-            console.warn('[TokenManager] Invalid token detected (empty or wrong type)', {
-              storageKey: TOKEN_STORAGE_KEY,
-              traceId,
-            });
             logTokenOperation('get', false, 'Invalid token detected: empty or wrong type', source, traceId);
             clearToken('invalid_token_detected', source, traceId);
           }
         } else {
           // Only log missing token if not during logout
           if (!logoutStateManager.isLogoutInProgress()) {
-            console.log('[TokenManager] No token found in storage', {
-              storageKey: TOKEN_STORAGE_KEY,
-              traceId,
-            });
             logTokenOperation('get', false, 'No token found', source, traceId);
           }
         }
@@ -379,25 +328,16 @@ export function getToken(source?: string, traceId?: string): string | null {
       // Validate JWT format
       if (!validateTokenFormat(token)) {
         if (!logoutStateManager.isLogoutInProgress()) {
-          console.warn('[TokenManager] Token format validation failed', {
-            storageKey: TOKEN_STORAGE_KEY,
-            traceId,
-          });
           logTokenOperation('get', false, 'Invalid token format: does not match JWT structure', source, traceId);
           clearToken('invalid_token_format', source, traceId);
         }
         return null;
       }
 
-      console.log('[TokenManager] Token retrieval successful', {
-        storageKey: TOKEN_STORAGE_KEY,
-        traceId,
-      });
       logTokenOperation('get', true, undefined, source, traceId);
       return token;
     }
     
-    console.error('[TokenManager] localStorage not available');
     logTokenOperation('get', false, 'localStorage not available', source, traceId);
     return null;
   } catch (error) {
@@ -421,25 +361,12 @@ export function getToken(source?: string, traceId?: string): string | null {
  * Requirements: 1.4, 4.1, 4.5, 2.2, 2.5, 3.2, 3.3
  */
 export function clearToken(reason?: string, source?: string, traceId?: string): void {
-  console.log('[TokenManager] clearToken attempt', {
-    storageKey: TOKEN_STORAGE_KEY,
-    reason,
-    source,
-    traceId,
-    timestamp: new Date().toISOString(),
-  });
-
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const hadToken = localStorage.getItem(TOKEN_STORAGE_KEY) !== null;
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       
       if (hadToken) {
-        console.log('[TokenManager] Token cleared from storage', {
-          storageKey: TOKEN_STORAGE_KEY,
-          reason,
-          traceId,
-        });
         logTokenOperation('clear', true, reason, source, traceId);
         
         // Dispatch custom event to notify components of token removal
@@ -448,13 +375,7 @@ export function clearToken(reason?: string, source?: string, traceId?: string): 
             detail: { action: 'clear', reason, traceId }
           });
           window.dispatchEvent(event);
-          console.log('[TokenManager] Dispatched auth-token-changed event', { action: 'clear', traceId });
         }
-      } else {
-        console.log('[TokenManager] No token to clear', {
-          storageKey: TOKEN_STORAGE_KEY,
-          traceId,
-        });
       }
     } else {
       logTokenOperation('clear', false, 'localStorage not available', source, traceId);
@@ -486,26 +407,9 @@ export function clearToken(reason?: string, source?: string, traceId?: string): 
  * Requirements: 1.5, 2.4, 6.3
  */
 export function hasToken(source?: string, traceId?: string): boolean {
-  console.log('[TokenManager] hasToken check', {
-    storageKey: TOKEN_STORAGE_KEY,
-    source,
-    traceId,
-    timestamp: new Date().toISOString(),
-  });
-
   // Call getToken internally to leverage all validation logic
   const token = getToken(source, traceId);
-  const result = token !== null;
-
-  console.log('[TokenManager] hasToken result', {
-    hasToken: result,
-    tokenPresent: token !== null,
-    tokenValid: result,
-    storageKey: TOKEN_STORAGE_KEY,
-    traceId,
-  });
-
-  return result;
+  return token !== null;
 }
 
 /**

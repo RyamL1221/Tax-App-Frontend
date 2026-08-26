@@ -15,6 +15,7 @@ import React, { useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useCsvUpload } from '@/hooks/useCsvUpload';
 import { ImportResultsView } from '@/components/forms/ImportResultsView';
+import { decodePdfResponse } from '@/lib/api/pdfUtils';
 
 
 export interface CsvUploadClientProps {
@@ -45,11 +46,11 @@ export default function CsvUploadClient({ className }: CsvUploadClientProps) {
   );
 
   /**
-   * Download a generated PDF via the existing download proxy.
-   * Requirement 7.4: use existing document download proxy.
+   * Download a generated PDF directly from the backend API.
+   * Requirement 7.4: use direct backend document download.
    */
   const handleDownload = useCallback(async (jobId: string) => {
-    const downloadUrl = `/api/proxy/download/${jobId}`;
+    const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL}/documents/download/${jobId}`;
     const token =
       typeof window !== 'undefined'
         ? localStorage.getItem('jwt_token')
@@ -71,7 +72,7 @@ export default function CsvUploadClient({ className }: CsvUploadClientProps) {
       throw { status: response.status, message: 'Failed to download document' };
     }
 
-    const blob = await response.blob();
+    const blob = await decodePdfResponse(response);
     const blobUrl = URL.createObjectURL(blob);
 
     // Trigger browser download
