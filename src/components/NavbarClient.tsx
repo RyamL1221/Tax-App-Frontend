@@ -138,7 +138,7 @@ export default function NavbarClient(): JSX.Element {
           <div className="flex items-center flex-shrink-0">
             <Link 
               href="/" 
-              className="text-lg sm:text-xl font-semibold text-white hover:text-blue-300 transition-colors duration-200"
+              className="flex items-center text-lg sm:text-xl font-semibold text-white hover:text-blue-300 transition-colors duration-200"
             >
               Home
             </Link>

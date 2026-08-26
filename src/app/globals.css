@@ -78,10 +78,13 @@ img, video {
 .skip-link {
   /* Screen reader accessible hiding technique */
   position: absolute;
+  top: -9999px;
   left: -9999px;
   width: 1px;
   height: 1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
   
   /* Styling for when visible */
   background-color: #1e40af; /* Blue-800 - WCAG AA compliant (8.59:1 contrast) */
@@ -104,6 +107,8 @@ img, video {
   width: auto;
   height: auto;
   overflow: visible;
+  clip: auto;
+  white-space: normal;
   
   /* Focus indicator */
   outline: 3px solid #fbbf24; /* Amber-400 for high visibility */
@@ -120,6 +125,16 @@ img, video {
 
 /* Ensure interactive elements have minimum touch target size */
 button, a, input, select, textarea {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Skip link should not be affected by min touch target when hidden */
+.skip-link {
+  min-height: 0;
+  min-width: 0;
+}
+.skip-link:focus {
   min-height: 44px;
   min-width: 44px;
 }
