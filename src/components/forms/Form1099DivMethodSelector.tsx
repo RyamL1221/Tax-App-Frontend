@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 import { CsvUploadSection } from '@/components/forms/CsvUploadSection';
@@ -20,15 +20,30 @@ export interface Form1099DivMethodSelectorProps {
  * Renders two selectable cards for choosing between CSV Bulk Upload
  * and Fill Out Form workflows for 1099-DIV submission.
  *
- * Cards are interactive, accessible, and keyboard-navigable.
- * Once a method is selected, the unselected card disappears and the
- * corresponding workflow content renders with a "Change method" control.
+ * Accessibility features:
+ * - aria-pressed on cards indicating selection state
+ * - Focus management: focus moves to "Change method" on selection,
+ *   returns to the previously-selected card on reset
+ * - aria-live region announces state changes for screen readers
+ * - Reduced-motion support via motion-reduce Tailwind variant
+ * - WCAG AA contrast on all text and interactive elements
  */
 export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelectorProps) {
   const [selectedMethod, setSelectedMethod] = useState<MethodSelection>(null);
+  const [announcement, setAnnouncement] = useState('');
+
+  // Refs for focus management
+  const changeMethodRef = useRef<HTMLButtonElement>(null);
+  const csvCardRef = useRef<HTMLDivElement>(null);
+  const manualCardRef = useRef<HTMLDivElement>(null);
+  const previousMethodRef = useRef<MethodSelection>(null);
 
   const handleSelect = (method: 'csv' | 'manual') => {
+    previousMethodRef.current = method;
     setSelectedMethod(method);
+    setAnnouncement(
+      method === 'csv' ? 'CSV Bulk Upload selected' : 'Fill Out Form selected'
+    );
   };
 
   const handleKeyDown = (method: 'csv' | 'manual') => (e: React.KeyboardEvent) => {
@@ -40,17 +55,46 @@ export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelect
 
   const handleChangeMethod = () => {
     setSelectedMethod(null);
+    setAnnouncement('Returned to method selection');
   };
+
+  // Focus management: move focus to "Change method" when a method is selected
+  useEffect(() => {
+    if (selectedMethod !== null && changeMethodRef.current) {
+      changeMethodRef.current.focus();
+    }
+  }, [selectedMethod]);
+
+  // Focus management: return focus to the previously-selected card when returning to selection
+  useEffect(() => {
+    if (selectedMethod === null && previousMethodRef.current !== null) {
+      const targetRef = previousMethodRef.current === 'csv' ? csvCardRef : manualCardRef;
+      if (targetRef.current) {
+        targetRef.current.focus();
+      }
+    }
+  }, [selectedMethod]);
 
   // Render selected method content
   if (selectedMethod === 'csv') {
     return (
-      <div className={cn('w-full transition-opacity duration-200', className)}>
+      <div className={cn(
+        'w-full',
+        'motion-safe:transition-opacity motion-safe:duration-200',
+        'motion-safe:animate-[fadeIn_200ms_ease-in]',
+        className
+      )}>
+        {/* Screen reader announcement */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {announcement}
+        </div>
+
         <div className="mb-6">
           <button
+            ref={changeMethodRef}
             type="button"
             onClick={handleChangeMethod}
-            className="text-sm text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:underline"
+            className="text-sm text-blue-700 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
             data-testid="change-method-button"
           >
             &larr; Change method
@@ -64,12 +108,23 @@ export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelect
 
   if (selectedMethod === 'manual') {
     return (
-      <div className={cn('w-full transition-opacity duration-200', className)}>
+      <div className={cn(
+        'w-full',
+        'motion-safe:transition-opacity motion-safe:duration-200',
+        'motion-safe:animate-[fadeIn_200ms_ease-in]',
+        className
+      )}>
+        {/* Screen reader announcement */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {announcement}
+        </div>
+
         <div className="mb-6">
           <button
+            ref={changeMethodRef}
             type="button"
             onClick={handleChangeMethod}
-            className="text-sm text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:underline"
+            className="text-sm text-blue-700 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
             data-testid="change-method-button"
           >
             &larr; Change method
@@ -85,19 +140,26 @@ export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelect
 
   return (
     <div className={cn('w-full', className)}>
+      {/* Screen reader announcement */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* CSV Bulk Upload Card */}
         <Card
+          ref={csvCardRef}
           variant="elevated"
           role="button"
           tabIndex={0}
           aria-label="Select CSV Bulk Upload method to upload multiple 1099-DIV forms via a CSV file"
+          aria-pressed={false}
           onClick={() => handleSelect('csv')}
           onKeyDown={handleKeyDown('csv')}
           className={cn(
             'cursor-pointer',
             'focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-            'hover:border-blue-300 transition-colors'
+            'hover:border-blue-400 motion-safe:transition-colors motion-safe:duration-200'
           )}
           data-testid="method-card-csv"
         >
@@ -127,16 +189,18 @@ export function Form1099DivMethodSelector({ className }: Form1099DivMethodSelect
 
         {/* Fill Out Form Card */}
         <Card
+          ref={manualCardRef}
           variant="elevated"
           role="button"
           tabIndex={0}
           aria-label="Select Fill Out Form method to manually enter a single 1099-DIV form"
+          aria-pressed={false}
           onClick={() => handleSelect('manual')}
           onKeyDown={handleKeyDown('manual')}
           className={cn(
             'cursor-pointer',
             'focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-            'hover:border-blue-300 transition-colors'
+            'hover:border-blue-400 motion-safe:transition-colors motion-safe:duration-200'
           )}
           data-testid="method-card-manual"
         >
