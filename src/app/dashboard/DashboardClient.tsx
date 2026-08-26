@@ -64,18 +64,7 @@ export default function DashboardClient() {
             </CardContent>
           </Card>
 
-          {/* Additional Information Section */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Need help?{' '}
-              <a
-                href="/help"
-                className="font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:underline transition-colors"
-              >
-                Visit our help center
-              </a>
-            </p>
-          </div>
+
         </div>
       </div>
     </ErrorBoundary>
