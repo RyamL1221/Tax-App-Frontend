@@ -276,43 +276,24 @@ export const form1099DivSchema = z.object({
   
   /**
    * Second state abbreviation (Box 13)
-   *
-   * Wrapped in z.preprocess to trim whitespace before validation so a
-   * whitespace-only value collapses to '' and passes via .or(z.literal('')).
-   * This keeps the optional State 2 subsection all-or-nothing.
    */
-  state2: z.preprocess(
-    (v) => (typeof v === 'string' ? v.trim() : v),
-    z.string()
-      .regex(stateRegex, 'State must be a 2-letter code (e.g., NY, CA)')
-      .optional()
-      .or(z.literal(''))
-  ),
+  state2: z.string()
+    .regex(stateRegex, 'State must be a 2-letter code (e.g., NY, CA)')
+    .optional()
+    .or(z.literal('')),
   
   /**
    * Second state identification number (Box 14)
-   *
-   * Wrapped in z.preprocess to trim whitespace before validation so a
-   * whitespace-only value collapses to '' and passes via .or(z.literal('')).
    */
-  stateIdentificationNumber2: z.preprocess(
-    (v) => (typeof v === 'string' ? v.trim() : v),
-    z.string().max(20, 'State ID must be 20 characters or less').optional().or(z.literal(''))
-  ),
+  stateIdentificationNumber2: z.string().max(20, 'State ID must be 20 characters or less').optional().or(z.literal('')),
   
   /**
    * Second state tax withheld (Box 15)
-   *
-   * Wrapped in z.preprocess to trim whitespace before validation so a
-   * whitespace-only value collapses to '' and passes via .or(z.literal('')).
    */
-  stateTaxWithheld2: z.preprocess(
-    (v) => (typeof v === 'string' ? v.trim() : v),
-    z.string()
-      .regex(currencyRegex, 'Must be a valid amount with up to 2 decimal places')
-      .optional()
-      .or(z.literal(''))
-  ),
+  stateTaxWithheld2: z.string()
+    .regex(currencyRegex, 'Must be a valid amount with up to 2 decimal places')
+    .optional()
+    .or(z.literal('')),
   
   // ===== Optional Account Field =====
   
